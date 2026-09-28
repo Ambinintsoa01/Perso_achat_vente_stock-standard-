@@ -7,6 +7,30 @@
 -- 1. TABLES DE RÉFÉRENCE & ÉTATS (LOOKUP TABLES)
 -- -----------------------------------------------------------------------------
 
+-- Profils d'utilisateurs (Gestion des rôles & droits d'accès)
+CREATE TABLE profil (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero INTEGER NOT NULL UNIQUE,     -- 1: ADMIN, 11: CAISSIER, 21: MAGASINIER
+    code TEXT NOT NULL UNIQUE,          -- 'ADMIN', 'CAISSIER', 'MAGASINIER'
+    libelle TEXT NOT NULL,
+    description TEXT,
+    actif INTEGER DEFAULT 1
+);
+
+-- Table des utilisateurs associés à un profil
+CREATE TABLE utilisateur (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_profil INTEGER NOT NULL REFERENCES profil(id) ON DELETE RESTRICT,
+    nom TEXT NOT NULL,
+    prenom TEXT,
+    email TEXT UNIQUE,
+    telephone TEXT,
+    nom_utilisateur TEXT NOT NULL UNIQUE,
+    mot_de_passe_hash TEXT NOT NULL,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (DATETIME('now', 'localtime'))
+);
+
 -- Table générique des statuts pour les documents (achats, ventes, factures, etc.)
 CREATE TABLE statut (
     id SERIAL PRIMARY KEY,
@@ -451,6 +475,7 @@ CREATE TABLE mouvement_stock (
 -- -----------------------------------------------------------------------------
 
 -- Articles & Dépôts
+CREATE INDEX idx_utilisateur_profil ON utilisateur(id_profil);
 CREATE INDEX idx_article_categorie ON article(id_categorie);
 CREATE INDEX idx_article_unite ON article(id_unite);
 CREATE INDEX idx_article_reference ON article(reference);
@@ -525,6 +550,16 @@ CREATE INDEX idx_mvt_stock_type ON mouvement_stock(id_type_mouvement);
 -- -----------------------------------------------------------------------------
 -- 8. DONNÉES INITIALES (SEEDING DE BASE)
 -- -----------------------------------------------------------------------------
+
+-- 8.0.0 Profils utilisateurs (RBAC)
+INSERT INTO profil (numero, code, libelle, description) VALUES
+(1,  'ADMIN',      'Administrateur / Gérant', 'Accès complet : tableaux de bord, caisses, marges, stocks et achats'),
+(11, 'CAISSIER',   'Caissier(e)',            'Effectuer commande, générer facture, valider livraison et paiement'),
+(21, 'MAGASINIER', 'Magasinier',             'Gestion des réceptions, expéditions, transferts et inventaires');
+
+-- 8.0.1 Utilisateur Administrateur par défaut
+INSERT INTO utilisateur (id_profil, nom, prenom, nom_utilisateur, mot_de_passe_hash) VALUES
+(1, 'Admin', 'Principal', 'admin', 'admin123');
 
 -- 8.1 Statuts standardisés (selon votre convention de numérotation)
 INSERT INTO statut (numero, code, libelle, description) VALUES
