@@ -19,7 +19,7 @@ CREATE TABLE statut (
 -- Modes de paiement (Espèces, Virement, Mvola, Orange Money, etc.)
 CREATE TABLE mode_paiement (
     id SERIAL PRIMARY KEY,
-    numero INT NOT NULL UNIQUE,     -- 1: 'ESPECES', 11: 'VIREMENT', 21: 'CHEQUE', 31: 'MVOLA', 41: 'ORANGE_MONEY', 51: 'AIRTEL_MONEY'
+    numero INT NOT NULL UNIQUE,     -- 1: ESPECES, 11: VIREMENT, 21: CHEQUE, 31: MVOLA, 41: ORANGE_MONEY, 51: AIRTEL_MONEY, 61: CARTE
     code VARCHAR(50) NOT NULL UNIQUE,
     libelle VARCHAR(100) NOT NULL,
     actif BOOLEAN DEFAULT TRUE
@@ -28,7 +28,7 @@ CREATE TABLE mode_paiement (
 -- Types de caisse / compte de trésorerie
 CREATE TABLE type_caisse (
     id SERIAL PRIMARY KEY,
-    numero INT NOT NULL UNIQUE,  -- 1: 'CAISSE_PHYSIQUE', 11: 'BANQUE', 21: 'MOBILE_MONEY'
+    numero INT NOT NULL UNIQUE,     -- 1: CAISSE_PHYSIQUE, 11: BANQUE, 21: MOBILE_MONEY
     code VARCHAR(50) NOT NULL UNIQUE,
     libelle VARCHAR(100) NOT NULL
 );
@@ -36,7 +36,7 @@ CREATE TABLE type_caisse (
 -- Types de mouvements de stock
 CREATE TABLE type_mouvement_stock (
     id SERIAL PRIMARY KEY,
-    numero INT NOT NULL UNIQUE,      -- 1: 'ENTREE_ACHAT', 11: 'SORTIE_VENTE', 21: 'AJUSTEMENT_POS', 31: 'AJUSTEMENT_NEG', etc.
+    numero INT NOT NULL UNIQUE,     -- 1: ENTREE_ACHAT, 11: SORTIE_VENTE, 21: AJUSTEMENT_POS, 31: AJUSTEMENT_NEG, etc.
     code VARCHAR(50) NOT NULL UNIQUE,
     libelle VARCHAR(100) NOT NULL,
     sens INT NOT NULL CHECK (sens IN (1, -1)), -- +1: Entrée, -1: Sortie
@@ -46,26 +46,30 @@ CREATE TABLE type_mouvement_stock (
 -- Types de mouvements de caisse / trésorerie
 CREATE TABLE type_mouvement_caisse (
     id SERIAL PRIMARY KEY,
-    numero INT NOT NULL UNIQUE,      -- 1: 'ENCAISSEMENT_VENTE', 11: 'DECAISSEMENT_ACHAT', 21: 'TRANSFERT_DEBIT', 31: 'TRANSFERT_CREDIT', etc.
+    numero INT NOT NULL UNIQUE,     -- 1: ENCAISSEMENT_VENTE, 11: DECAISSEMENT_ACHAT, 21: TRANSFERT_DEBIT, 31: TRANSFERT_CREDIT, etc.
     code VARCHAR(50) NOT NULL UNIQUE,
     libelle VARCHAR(100) NOT NULL,
     sens INT NOT NULL CHECK (sens IN (1, -1)), -- +1: Entrée d'argent, -1: Sortie d'argent
     actif BOOLEAN DEFAULT TRUE
 );
 
--- Type de client
+-- Types de clients
 CREATE TABLE type_client (
     id SERIAL PRIMARY KEY,
-    numero INT NOT NULl UNIQUE,   -- 1: PARTICULIER, 11: ENTREPRISE, 21: AUTRE
+    numero INT NOT NULL UNIQUE,     -- 1: PARTICULIER, 11: ENTREPRISE, 21: AUTRE
     code VARCHAR(50) NOT NULL UNIQUE,
-    libelle VARCHAR (100) NOT NULL
-)
+    libelle VARCHAR(100) NOT NULL
+);
 
--- Devise monnaie
+-- Devises monétaires
 CREATE TABLE devise (
     id SERIAL PRIMARY KEY,
-    libelle VARCHAR (10) NOT NULL
-)
+    numero INT NOT NULL UNIQUE,     -- 1: MGA, 11: EUR, 21: USD
+    code VARCHAR(10) NOT NULL UNIQUE,
+    libelle VARCHAR(50) NOT NULL,
+    symbole VARCHAR(10) DEFAULT 'Ar',
+    actif BOOLEAN DEFAULT TRUE
+);
 
 -- Catégories d'articles (avec support hiérarchique)
 CREATE TABLE categorie (
@@ -139,7 +143,7 @@ CREATE TABLE client (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
     nom_complet VARCHAR(255) NOT NULL,
-    id_type_client INT NOT NULL,
+    id_type_client INT NOT NULL REFERENCES type_client(id) ON DELETE RESTRICT,
     telephone VARCHAR(50),
     email VARCHAR(150),
     adresse TEXT,
@@ -165,7 +169,7 @@ CREATE TABLE caisse (
     numero_compte VARCHAR(100),                    -- IBAN, RIB ou numéro mobile money
     solde_initial NUMERIC(15, 2) DEFAULT 0.00,
     solde_actuel NUMERIC(15, 2) DEFAULT 0.00,
-    id_devise INT NOT NULL,
+    id_devise INT NOT NULL REFERENCES devise(id) ON DELETE RESTRICT,
     actif BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -443,27 +447,86 @@ CREATE TABLE mouvement_stock (
 );
 
 -- -----------------------------------------------------------------------------
--- 7. INDEX DE PERFORMANCE
+-- 7. INDEX DE PERFORMANCE & CLÉS ÉTRANGÈRES
 -- -----------------------------------------------------------------------------
+
+-- Articles & Dépôts
 CREATE INDEX idx_article_categorie ON article(id_categorie);
+CREATE INDEX idx_article_unite ON article(id_unite);
 CREATE INDEX idx_article_reference ON article(reference);
 CREATE INDEX idx_stock_depot_article ON stock_depot(id_depot, id_article);
-CREATE INDEX idx_mvt_stock_article_depot ON mouvement_stock(id_article, id_depot);
+
+-- Tiers
+CREATE INDEX idx_client_type_client ON client(id_type_client);
+
+-- Multi-Caisse & Trésorerie
+CREATE INDEX idx_caisse_type_caisse ON caisse(id_type_caisse);
+CREATE INDEX idx_caisse_devise ON caisse(id_devise);
+CREATE INDEX idx_mvt_caisse_caisse ON mouvement_caisse(id_caisse);
+CREATE INDEX idx_mvt_caisse_type ON mouvement_caisse(id_type_mouvement);
+CREATE INDEX idx_mvt_caisse_mode ON mouvement_caisse(id_mode_paiement);
+CREATE INDEX idx_transfert_caisse_src ON transfert_caisse(id_caisse_source);
+CREATE INDEX idx_transfert_caisse_dest ON transfert_caisse(id_caisse_destination);
+CREATE INDEX idx_transfert_caisse_statut ON transfert_caisse(id_statut);
+
+-- Workflow Achat
 CREATE INDEX idx_cmd_achat_fournisseur ON commande_achat(id_fournisseur);
+CREATE INDEX idx_cmd_achat_depot ON commande_achat(id_depot_destination);
 CREATE INDEX idx_cmd_achat_statut ON commande_achat(id_statut);
-CREATE INDEX idx_cmd_vente_client ON commande_vente(id_client);
-CREATE INDEX idx_cmd_vente_statut ON commande_vente(id_statut);
+CREATE INDEX idx_cmd_achat_ligne_cmd ON commande_achat_ligne(id_commande_achat);
+CREATE INDEX idx_cmd_achat_ligne_article ON commande_achat_ligne(id_article);
+
+CREATE INDEX idx_reception_achat_fournisseur ON reception_achat(id_fournisseur);
+CREATE INDEX idx_reception_achat_cmd ON reception_achat(id_commande_achat);
+CREATE INDEX idx_reception_achat_depot ON reception_achat(id_depot);
+CREATE INDEX idx_reception_achat_statut ON reception_achat(id_statut);
+CREATE INDEX idx_reception_achat_ligne_rec ON reception_achat_ligne(id_reception);
+CREATE INDEX idx_reception_achat_ligne_art ON reception_achat_ligne(id_article);
+
+CREATE INDEX idx_facture_fournisseur_fournisseur ON facture_fournisseur(id_fournisseur);
+CREATE INDEX idx_facture_fournisseur_cmd ON facture_fournisseur(id_commande_achat);
 CREATE INDEX idx_facture_fournisseur_statut ON facture_fournisseur(id_statut);
-CREATE INDEX idx_facture_client_statut ON facture_client(id_statut);
-CREATE INDEX idx_mouvement_caisse_caisse ON mouvement_caisse(id_caisse);
-CREATE INDEX idx_paiement_vente_caisse ON paiement_vente(id_caisse);
+CREATE INDEX idx_paiement_achat_facture ON paiement_achat(id_facture_fournisseur);
 CREATE INDEX idx_paiement_achat_caisse ON paiement_achat(id_caisse);
+CREATE INDEX idx_paiement_achat_mode ON paiement_achat(id_mode_paiement);
+
+-- Workflow Vente
+CREATE INDEX idx_devis_vente_client ON devis_vente(id_client);
+CREATE INDEX idx_devis_vente_statut ON devis_vente(id_statut);
+CREATE INDEX idx_devis_vente_ligne_dev ON devis_vente_ligne(id_devis);
+CREATE INDEX idx_devis_vente_ligne_art ON devis_vente_ligne(id_article);
+
+CREATE INDEX idx_cmd_vente_client ON commande_vente(id_client);
+CREATE INDEX idx_cmd_vente_devis ON commande_vente(id_devis);
+CREATE INDEX idx_cmd_vente_depot ON commande_vente(id_depot_source);
+CREATE INDEX idx_cmd_vente_statut ON commande_vente(id_statut);
+CREATE INDEX idx_cmd_vente_ligne_cmd ON commande_vente_ligne(id_commande_vente);
+CREATE INDEX idx_cmd_vente_ligne_article ON commande_vente_ligne(id_article);
+
+CREATE INDEX idx_livraison_vente_client ON livraison_vente(id_client);
+CREATE INDEX idx_livraison_vente_cmd ON livraison_vente(id_commande_vente);
+CREATE INDEX idx_livraison_vente_depot ON livraison_vente(id_depot);
+CREATE INDEX idx_livraison_vente_statut ON livraison_vente(id_statut);
+CREATE INDEX idx_livraison_vente_ligne_liv ON livraison_vente_ligne(id_livraison);
+CREATE INDEX idx_livraison_vente_ligne_art ON livraison_vente_ligne(id_article);
+
+CREATE INDEX idx_facture_client_client ON facture_client(id_client);
+CREATE INDEX idx_facture_client_cmd ON facture_client(id_commande_vente);
+CREATE INDEX idx_facture_client_liv ON facture_client(id_livraison);
+CREATE INDEX idx_facture_client_statut ON facture_client(id_statut);
+CREATE INDEX idx_paiement_vente_facture ON paiement_vente(id_facture_client);
+CREATE INDEX idx_paiement_vente_caisse ON paiement_vente(id_caisse);
+CREATE INDEX idx_paiement_vente_mode ON paiement_vente(id_mode_paiement);
+
+-- Stocks
+CREATE INDEX idx_mvt_stock_article_depot ON mouvement_stock(id_article, id_depot);
+CREATE INDEX idx_mvt_stock_type ON mouvement_stock(id_type_mouvement);
 
 -- -----------------------------------------------------------------------------
 -- 8. DONNÉES INITIALES (SEEDING DE BASE)
 -- -----------------------------------------------------------------------------
 
--- Statuts standardisés selon votre convention
+-- 8.1 Statuts standardisés (selon votre convention de numérotation)
 INSERT INTO statut (numero, code, libelle, description) VALUES
 (1,  'CREE',      'Créé / Brouillon',       'Document initié mais non encore validé'),
 (11, 'VALIDE',    'Validé',                 'Document confirmé et actif'),
@@ -471,38 +534,50 @@ INSERT INTO statut (numero, code, libelle, description) VALUES
 (31, 'PARTIEL',   'Partiellement traité',   'Partiellement reçu, livré ou payé'),
 (41, 'SOLDE',     'Soldé / Clôturé',        'Totalement traité, livré ou soldé');
 
--- Modes de paiement usuels
-INSERT INTO mode_paiement (code, libelle) VALUES
-('ESPECES',      'Espèces / Cash'),
-('VIREMENT',     'Virement Bancaire'),
-('CHEQUE',       'Chèque'),
-('MVOLA',        'Mvola'),
-('ORANGE_MONEY', 'Orange Money'),
-('AIRTEL_MONEY', 'Airtel Money'),
-('CARTE',        'Carte Bancaire');
+-- 8.2 Modes de paiement usuels (avec numéros)
+INSERT INTO mode_paiement (numero, code, libelle) VALUES
+(1,  'ESPECES',      'Espèces / Cash'),
+(11, 'VIREMENT',     'Virement Bancaire'),
+(21, 'CHEQUE',       'Chèque'),
+(31, 'MVOLA',        'Mvola'),
+(41, 'ORANGE_MONEY', 'Orange Money'),
+(51, 'AIRTEL_MONEY', 'Airtel Money'),
+(61, 'CARTE',        'Carte Bancaire');
 
--- Types de caisses / comptes
-INSERT INTO type_caisse (code, libelle) VALUES
-('CAISSE_PHYSIQUE', 'Caisse Physique / Espèces'),
-('BANQUE',          'Compte Bancaire'),
-('MOBILE_MONEY',    'Compte Mobile Money');
+-- 8.3 Types de caisses / comptes financiers
+INSERT INTO type_caisse (numero, code, libelle) VALUES
+(1,  'CAISSE_PHYSIQUE', 'Caisse Physique / Espèces'),
+(11, 'BANQUE',          'Compte Bancaire'),
+(21, 'MOBILE_MONEY',    'Compte Mobile Money');
 
--- Types de mouvements de stock (+1: Entrée, -1: Sortie)
-INSERT INTO type_mouvement_stock (code, libelle, sens) VALUES
-('ENTREE_ACHAT',         'Entrée Réception Achat',       1),
-('SORTIE_VENTE',         'Sortie Livraison Vente',      -1),
-('AJUSTEMENT_POSITIF',   'Ajustement Inventaire Positif', 1),
-('AJUSTEMENT_NEGATIF',   'Ajustement Inventaire Négatif', -1),
-('TRANSFERT_ENTREE',     'Transfert Dépôt Entrant',       1),
-('TRANSFERT_SORTIE',     'Transfert Dépôt Sortant',      -1),
-('RETOUR_CLIENT',        'Retour Produit Client',         1),
-('RETOUR_FOURNISSEUR',   'Retour Produit Fournisseur',   -1);
+-- 8.4 Types de clients
+INSERT INTO type_client (numero, code, libelle) VALUES
+(1,  'PARTICULIER', 'Particulier'),
+(11, 'ENTREPRISE',  'Entreprise / Société'),
+(21, 'AUTRE',       'Autre / Institutionnel');
 
--- Types de mouvements de caisse (+1: Entrée d'argent, -1: Sortie d'argent)
-INSERT INTO type_mouvement_caisse (code, libelle, sens) VALUES
-('ENCAISSEMENT_VENTE',       'Encaissement Règlement Client',       1),
-('DECAISSEMENT_ACHAT',       'Décaissement Règlement Fournisseur', -1),
-('TRANSFERT_INTERNE_DEBIT',  'Transfert Interne (Sortie caisse)',   -1),
-('TRANSFERT_INTERNE_CREDIT', 'Transfert Interne (Entrée caisse)',    1),
-('DEPENSE_DIVERSE',          'Dépense Diverse / Charge',            -1),
-('APPORT_FONDS',             'Apport de Fonds / Alimentation',       1);
+-- 8.5 Devises
+INSERT INTO devise (numero, code, libelle, symbole) VALUES
+(1,  'MGA', 'Ariary',    'Ar'),
+(11, 'EUR', 'Euro',      '€'),
+(21, 'USD', 'Dollar US', '$');
+
+-- 8.6 Types de mouvements de stock (+1: Entrée, -1: Sortie)
+INSERT INTO type_mouvement_stock (numero, code, libelle, sens) VALUES
+(1,  'ENTREE_ACHAT',         'Entrée Réception Achat',        1),
+(11, 'SORTIE_VENTE',         'Sortie Livraison Vente',       -1),
+(21, 'AJUSTEMENT_POSITIF',   'Ajustement Inventaire Positif', 1),
+(31, 'AJUSTEMENT_NEGATIF',   'Ajustement Inventaire Négatif',-1),
+(41, 'TRANSFERT_ENTREE',     'Transfert Dépôt Entrant',        1),
+(51, 'TRANSFERT_SORTIE',     'Transfert Dépôt Sortant',       -1),
+(61, 'RETOUR_CLIENT',        'Retour Produit Client',          1),
+(71, 'RETOUR_FOURNISSEUR',   'Retour Produit Fournisseur',    -1);
+
+-- 8.7 Types de mouvements de caisse (+1: Entrée d'argent, -1: Sortie d'argent)
+INSERT INTO type_mouvement_caisse (numero, code, libelle, sens) VALUES
+(1,  'ENCAISSEMENT_VENTE',       'Encaissement Règlement Client',        1),
+(11, 'DECAISSEMENT_ACHAT',       'Décaissement Règlement Fournisseur',  -1),
+(21, 'TRANSFERT_INTERNE_DEBIT',  'Transfert Interne (Sortie caisse)',    -1),
+(31, 'TRANSFERT_INTERNE_CREDIT', 'Transfert Interne (Entrée caisse)',     1),
+(41, 'DEPENSE_DIVERSE',          'Dépense Diverse / Charge',             -1),
+(51, 'APPORT_FONDS',             'Apport de Fonds / Alimentation',        1);
