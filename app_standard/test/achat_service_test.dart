@@ -102,7 +102,7 @@ void main() {
     );
     expect(mvtsStock.isNotEmpty, true);
     expect((mvtsStock.last['quantite'] as num).toDouble(), qteAchetee);
-    expect((mvtsStock.last['sens'] as num).toInt(), 1);
+    expect((mvtsStock.last['stock_apres'] as num).toDouble(), stockInitialArticle + qteAchetee);
 
     // 4. Vérifier l'impact sur la CAISSE
     final caissesApres = await caisseService.getCaisses();
@@ -117,7 +117,7 @@ void main() {
     );
     expect(mvtsCaisse.isNotEmpty, true);
     expect((mvtsCaisse.last['montant'] as num).toDouble(), montantTotal);
-    expect((mvtsCaisse.last['sens'] as num).toInt(), -1);
+    expect((mvtsCaisse.last['solde_apres'] as num).toDouble(), soldeInitialCaisse - montantTotal);
   });
 
   test('Achat à crédit: augmente le stock sans impacter la caisse, puis règlement de la dette', () async {
