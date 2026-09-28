@@ -1,13 +1,58 @@
 -- =============================================================================
--- BASE DE DONNÉES : GESTION DES ACHATS, VENTES ET STOCKS
--- Compatible : PostgreSQL, MySQL / MariaDB (ajuster SERIAL -> INT AUTO_INCREMENT)
+-- BASE DE DONNÉES : GESTION DES ACHATS, VENTES, STOCKS & TRÉSORERIE (MULTI-CAISSE)
+-- Compatible : PostgreSQL (SERIAL), adaptable MySQL (INT AUTO_INCREMENT)
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. RÉFÉRENTIELS & PARAMÉTRAGE DE BASE
+-- 1. TABLES DE RÉFÉRENCE & ÉTATS (LOOKUP TABLES)
 -- -----------------------------------------------------------------------------
 
--- Catégories d'articles (avec support hiérarchique parent/enfant)
+-- Table générique des statuts pour les documents (achats, ventes, factures, etc.)
+CREATE TABLE statut (
+    id SERIAL PRIMARY KEY,
+    numero INT NOT NULL UNIQUE,     -- 1: créé, 11: validé, 21: annulé, 31: partiel, 41: terminé/soldé
+    code VARCHAR(50) NOT NULL UNIQUE,
+    libelle VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
+-- Modes de paiement (Espèces, Virement, Mvola, Orange Money, etc.)
+CREATE TABLE mode_paiement (
+    id SERIAL PRIMARY KEY,
+    numero INT NOT NULL UNIQUE,     -- 1: 'ESPECES', 11: 'VIREMENT', 21: 'CHEQUE', 31: 'MVOLA', 41: 'ORANGE_MONEY', 51: 'AIRTEL_MONEY'
+    code VARCHAR(50) NOT NULL UNIQUE,
+    libelle VARCHAR(100) NOT NULL,
+    actif BOOLEAN DEFAULT TRUE
+);
+
+-- Types de caisse / compte de trésorerie
+CREATE TABLE type_caisse (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,  -- 'CAISSE_PHYSIQUE', 'BANQUE', 'MOBILE_MONEY'
+    libelle VARCHAR(100) NOT NULL
+);
+
+-- Types de mouvements de stock
+CREATE TABLE type_mouvement_stock (
+    id SERIAL PRIMARY KEY,
+    numero INT NOT NULL UNIQUE,      -- 1: 'ENTREE_ACHAT', 11: 'SORTIE_VENTE', 21: 'AJUSTEMENT_POS', 31: 'AJUSTEMENT_NEG', etc.
+    code VARCHAR(50) NOT NULL UNIQUE,
+    libelle VARCHAR(100) NOT NULL,
+    sens INT NOT NULL CHECK (sens IN (1, -1)), -- +1: Entrée, -1: Sortie
+    actif BOOLEAN DEFAULT TRUE
+);
+
+-- Types de mouvements de caisse / trésorerie
+CREATE TABLE type_mouvement_caisse (
+    id SERIAL PRIMARY KEY,
+    numero INT NOT NULL UNIQUE,      -- 1: 'ENCAISSEMENT_VENTE', 11: 'DECAISSEMENT_ACHAT', 21: 'TRANSFERT_DEBIT', 31: 'TRANSFERT_CREDIT', etc.
+    code VARCHAR(50) NOT NULL UNIQUE,
+    libelle VARCHAR(100) NOT NULL,
+    sens INT NOT NULL CHECK (sens IN (1, -1)), -- +1: Entrée d'argent, -1: Sortie d'argent
+    actif BOOLEAN DEFAULT TRUE
+);
+
+-- Catégories d'articles (avec support hiérarchique)
 CREATE TABLE categorie (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
@@ -18,15 +63,15 @@ CREATE TABLE categorie (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Unités de mesure (Pièce, Kg, Litre, Carton, etc.)
+-- Unités de mesure
 CREATE TABLE unite_mesure (
     id SERIAL PRIMARY KEY,
-    code VARCHAR(20) NOT NULL UNIQUE,       -- ex: U, KG, L, CRT, M
-    nom VARCHAR(100) NOT NULL,              -- ex: Unité, Kilogramme, Litre
+    code VARCHAR(20) NOT NULL UNIQUE,       -- U, KG, L, CRT, M
+    nom VARCHAR(100) NOT NULL,
     actif BOOLEAN DEFAULT TRUE
 );
 
--- Dépôts / Magasins de stockage
+-- Dépôts / Magasins physiques de stockage
 CREATE TABLE depot (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
@@ -47,9 +92,9 @@ CREATE TABLE article (
     id_unite INT REFERENCES unite_mesure(id) ON DELETE RESTRICT,
     prix_achat_estime NUMERIC(15, 2) DEFAULT 0.00,
     prix_vente_standard NUMERIC(15, 2) DEFAULT 0.00,
-    taux_tva NUMERIC(5, 2) DEFAULT 20.00,   -- Taux TVA en % (ex: 20%)
+    taux_tva NUMERIC(5, 2) DEFAULT 20.00,
     seuil_alerte_stock NUMERIC(15, 3) DEFAULT 0.000,
-    suivi_stock BOOLEAN DEFAULT TRUE,       -- Si FALSE : prestation de service sans stock
+    suivi_stock BOOLEAN DEFAULT TRUE,
     actif BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -59,7 +104,6 @@ CREATE TABLE article (
 -- 2. TIERS (Fournisseurs & Clients)
 -- -----------------------------------------------------------------------------
 
--- Fournisseurs
 CREATE TABLE fournisseur (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
@@ -76,12 +120,11 @@ CREATE TABLE fournisseur (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Clients
 CREATE TABLE client (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
     nom_complet VARCHAR(255) NOT NULL,
-    type_client VARCHAR(50) DEFAULT 'PARTICULIER', -- 'PARTICULIER', 'ENTREPRISE', etc.
+    type_client VARCHAR(50) DEFAULT 'PARTICULIER',
     telephone VARCHAR(50),
     email VARCHAR(150),
     adresse TEXT,
@@ -94,19 +137,68 @@ CREATE TABLE client (
 );
 
 -- -----------------------------------------------------------------------------
--- 3. WORKFLOW ACHAT (Fournisseur)
--- Commande (BC) -> Réception (BR, Entrée en Stock) -> Facture -> Paiement
+-- 3. GESTION MULTI-CAISSE & TRÉSORERIE
+-- (Banque, Caisse physique, Mvola, Orange Money...)
 -- -----------------------------------------------------------------------------
 
--- Commandes d'Achat (Bon de Commande Fournisseur)
+-- Registre des caisses et comptes financiers
+CREATE TABLE caisse (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,              -- ex: 'CAISSE-MAGASIN-01', 'BNI-MGA', 'MVOLA-PRO'
+    nom VARCHAR(150) NOT NULL,                    -- ex: 'Caisse Principale', 'Compte Courant BNI', 'Compte Mvola'
+    id_type_caisse INT NOT NULL REFERENCES type_caisse(id) ON DELETE RESTRICT,
+    numero_compte VARCHAR(100),                    -- IBAN, RIB ou numéro mobile money
+    solde_initial NUMERIC(15, 2) DEFAULT 0.00,
+    solde_actuel NUMERIC(15, 2) DEFAULT 0.00,
+    devise VARCHAR(10) DEFAULT 'MGA',
+    actif BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Journal des mouvements de caisse / trésorerie
+CREATE TABLE mouvement_caisse (
+    id SERIAL PRIMARY KEY,
+    id_caisse INT NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
+    id_type_mouvement INT NOT NULL REFERENCES type_mouvement_caisse(id) ON DELETE RESTRICT,
+    id_mode_paiement INT NOT NULL REFERENCES mode_paiement(id) ON DELETE RESTRICT,
+    montant NUMERIC(15, 2) NOT NULL CHECK (montant > 0),
+    solde_avant NUMERIC(15, 2) NOT NULL,
+    solde_apres NUMERIC(15, 2) NOT NULL,
+    date_mouvement TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reference_piece VARCHAR(100),                  -- Réf paiement vente/achat, numéro chèque, réf transaction
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Transferts internes entre caisses (ex: Caisse physique -> Banque, ou Mvola -> Banque)
+CREATE TABLE transfert_caisse (
+    id SERIAL PRIMARY KEY,
+    numero_transfert VARCHAR(50) NOT NULL UNIQUE,  -- ex: TRF-2026-0001
+    id_caisse_source INT NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
+    id_caisse_destination INT NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
+    montant NUMERIC(15, 2) NOT NULL CHECK (montant > 0),
+    frais_transfert NUMERIC(15, 2) DEFAULT 0.00,   -- Frais opérateur (ex: retrait Mvola)
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
+    date_transfert TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    motif TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_transfert_caisses_distinctes CHECK (id_caisse_source <> id_caisse_destination)
+);
+
+-- -----------------------------------------------------------------------------
+-- 4. WORKFLOW ACHAT (Fournisseur)
+-- Commande (BC) -> Réception (BR, Entrée Stock) -> Facture -> Paiement (Caisse)
+-- -----------------------------------------------------------------------------
+
+-- Bons de Commande Fournisseur
 CREATE TABLE commande_achat (
     id SERIAL PRIMARY KEY,
-    numero_commande VARCHAR(50) NOT NULL UNIQUE, -- ex: BCA-2026-0001
+    numero_commande VARCHAR(50) NOT NULL UNIQUE,   -- ex: BCA-2026-0001
     id_fournisseur INT NOT NULL REFERENCES fournisseur(id) ON DELETE RESTRICT,
     id_depot_destination INT NOT NULL REFERENCES depot(id) ON DELETE RESTRICT,
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
     date_commande DATE NOT NULL DEFAULT CURRENT_DATE,
     date_livraison_prevue DATE,
-    statut VARCHAR(50) NOT NULL DEFAULT 'BROUILLON', -- 'BROUILLON', 'VALIDEE', 'PARTIELLEMENT_RECUE', 'RECUE', 'ANNULEE'
     montant_ht NUMERIC(15, 2) DEFAULT 0.00,
     montant_tva NUMERIC(15, 2) DEFAULT 0.00,
     montant_ttc NUMERIC(15, 2) DEFAULT 0.00,
@@ -115,7 +207,7 @@ CREATE TABLE commande_achat (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Lignes de Commande d'Achat
+-- Lignes de Commande Achat
 CREATE TABLE commande_achat_ligne (
     id SERIAL PRIMARY KEY,
     id_commande_achat INT NOT NULL REFERENCES commande_achat(id) ON DELETE CASCADE,
@@ -129,16 +221,16 @@ CREATE TABLE commande_achat_ligne (
     montant_ttc NUMERIC(15, 2) NOT NULL
 );
 
--- Bons de Réception Achat (Déclencheur de l'entrée de stock)
+-- Bons de Réception Fournisseur (Entrée effective des marchandises)
 CREATE TABLE reception_achat (
     id SERIAL PRIMARY KEY,
-    numero_reception VARCHAR(50) NOT NULL UNIQUE, -- ex: BRA-2026-0001
+    numero_reception VARCHAR(50) NOT NULL UNIQUE,  -- ex: BRA-2026-0001
     id_commande_achat INT REFERENCES commande_achat(id) ON DELETE SET NULL,
     id_fournisseur INT NOT NULL REFERENCES fournisseur(id) ON DELETE RESTRICT,
     id_depot INT NOT NULL REFERENCES depot(id) ON DELETE RESTRICT,
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
     date_reception TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    numero_bon_fournisseur VARCHAR(100),         -- Réf du bon de livraison papier fournisseur
-    statut VARCHAR(50) NOT NULL DEFAULT 'VALIDEE', -- 'BROUILLON', 'VALIDEE', 'ANNULEE'
+    numero_bon_fournisseur VARCHAR(100),
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -153,15 +245,15 @@ CREATE TABLE reception_achat_ligne (
     prix_achat_unitaire_ht NUMERIC(15, 2) NOT NULL
 );
 
--- Factures Fournisseurs (Achat)
+-- Factures Fournisseurs
 CREATE TABLE facture_fournisseur (
     id SERIAL PRIMARY KEY,
-    numero_facture VARCHAR(50) NOT NULL UNIQUE,     -- ex: FA-2026-0001 ou référence facture fournisseur
+    numero_facture VARCHAR(50) NOT NULL UNIQUE,
     id_fournisseur INT NOT NULL REFERENCES fournisseur(id) ON DELETE RESTRICT,
     id_commande_achat INT REFERENCES commande_achat(id) ON DELETE SET NULL,
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
     date_facture DATE NOT NULL DEFAULT CURRENT_DATE,
     date_echeance DATE,
-    statut_facture VARCHAR(50) DEFAULT 'NON_PAYEE', -- 'NON_PAYEE', 'PARTIELLEMENT_PAYEE', 'PAYEE', 'ANNULEE'
     montant_ht NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
     montant_tva NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
     montant_ttc NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
@@ -169,32 +261,33 @@ CREATE TABLE facture_fournisseur (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Paiements Fournisseurs
+-- Paiements Fournisseurs (Rattachés à une Caisse / Banque / Mvola)
 CREATE TABLE paiement_achat (
     id SERIAL PRIMARY KEY,
-    numero_paiement VARCHAR(50) NOT NULL UNIQUE,
+    numero_paiement VARCHAR(50) NOT NULL UNIQUE,   -- ex: PA-2026-0001
     id_facture_fournisseur INT NOT NULL REFERENCES facture_fournisseur(id) ON DELETE RESTRICT,
+    id_caisse INT NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,             -- Caisse débitée
+    id_mode_paiement INT NOT NULL REFERENCES mode_paiement(id) ON DELETE RESTRICT,
     date_paiement DATE NOT NULL DEFAULT CURRENT_DATE,
     montant NUMERIC(15, 2) NOT NULL CHECK (montant > 0),
-    mode_paiement VARCHAR(50) NOT NULL, -- 'ESPECES', 'CHEQUE', 'VIREMENT', 'MOBILE_MONEY'
-    reference_transaction VARCHAR(100),
+    reference_transaction VARCHAR(100),            -- ex: Référence Mvola, numéro chèque, virement
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
--- 4. WORKFLOW VENTE (Client)
--- Devis -> Commande (BC) -> Livraison (BL, Sortie de Stock) -> Facture -> Règlement
+-- 5. WORKFLOW VENTE (Client)
+-- Devis -> Commande (BC) -> Livraison (BL, Sortie Stock) -> Facture -> Paiement (Caisse)
 -- -----------------------------------------------------------------------------
 
--- Devis / Proformas Vente
+-- Devis / Offres Commerciales
 CREATE TABLE devis_vente (
     id SERIAL PRIMARY KEY,
-    numero_devis VARCHAR(50) NOT NULL UNIQUE, -- ex: DEV-2026-0001
+    numero_devis VARCHAR(50) NOT NULL UNIQUE,      -- ex: DEV-2026-0001
     id_client INT NOT NULL REFERENCES client(id) ON DELETE RESTRICT,
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
     date_devis DATE NOT NULL DEFAULT CURRENT_DATE,
     date_validite DATE,
-    statut VARCHAR(50) DEFAULT 'EN_ATTENTE',   -- 'EN_ATTENTE', 'ACCEPTE', 'REFUSE', 'EXPIRE'
     montant_ht NUMERIC(15, 2) DEFAULT 0.00,
     montant_tva NUMERIC(15, 2) DEFAULT 0.00,
     montant_ttc NUMERIC(15, 2) DEFAULT 0.00,
@@ -218,13 +311,13 @@ CREATE TABLE devis_vente_ligne (
 -- Commandes de Vente (Bons de Commande Client)
 CREATE TABLE commande_vente (
     id SERIAL PRIMARY KEY,
-    numero_commande VARCHAR(50) NOT NULL UNIQUE, -- ex: BCV-2026-0001
+    numero_commande VARCHAR(50) NOT NULL UNIQUE,   -- ex: BCV-2026-0001
     id_client INT NOT NULL REFERENCES client(id) ON DELETE RESTRICT,
     id_devis INT REFERENCES devis_vente(id) ON DELETE SET NULL,
     id_depot_source INT NOT NULL REFERENCES depot(id) ON DELETE RESTRICT,
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
     date_commande DATE NOT NULL DEFAULT CURRENT_DATE,
     date_livraison_souhaitee DATE,
-    statut VARCHAR(50) NOT NULL DEFAULT 'BROUILLON', -- 'BROUILLON', 'VALIDEE', 'EN_PREPARATION', 'PARTIELLEMENT_LIVREE', 'LIVREE', 'ANNULEE'
     montant_ht NUMERIC(15, 2) DEFAULT 0.00,
     montant_tva NUMERIC(15, 2) DEFAULT 0.00,
     montant_ttc NUMERIC(15, 2) DEFAULT 0.00,
@@ -233,7 +326,7 @@ CREATE TABLE commande_vente (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Lignes de Commande de Vente
+-- Lignes de Commande Vente
 CREATE TABLE commande_vente_ligne (
     id SERIAL PRIMARY KEY,
     id_commande_vente INT NOT NULL REFERENCES commande_vente(id) ON DELETE CASCADE,
@@ -247,15 +340,15 @@ CREATE TABLE commande_vente_ligne (
     montant_ttc NUMERIC(15, 2) NOT NULL
 );
 
--- Bons de Livraison Vente (Déclencheur de la sortie de stock)
+-- Bons de Livraison Vente (Sortie effective du stock)
 CREATE TABLE livraison_vente (
     id SERIAL PRIMARY KEY,
-    numero_livraison VARCHAR(50) NOT NULL UNIQUE, -- ex: BLV-2026-0001
+    numero_livraison VARCHAR(50) NOT NULL UNIQUE,  -- ex: BLV-2026-0001
     id_commande_vente INT REFERENCES commande_vente(id) ON DELETE SET NULL,
     id_client INT NOT NULL REFERENCES client(id) ON DELETE RESTRICT,
     id_depot INT NOT NULL REFERENCES depot(id) ON DELETE RESTRICT,
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
     date_livraison TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    statut VARCHAR(50) NOT NULL DEFAULT 'VALIDEE', -- 'BROUILLON', 'VALIDEE', 'ANNULEE'
     nom_livreur VARCHAR(100),
     adresse_livraison TEXT,
     notes TEXT,
@@ -279,9 +372,9 @@ CREATE TABLE facture_client (
     id_client INT NOT NULL REFERENCES client(id) ON DELETE RESTRICT,
     id_commande_vente INT REFERENCES commande_vente(id) ON DELETE SET NULL,
     id_livraison INT REFERENCES livraison_vente(id) ON DELETE SET NULL,
+    id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
     date_facture DATE NOT NULL DEFAULT CURRENT_DATE,
     date_echeance DATE,
-    statut_facture VARCHAR(50) DEFAULT 'NON_PAYEE', -- 'NON_PAYEE', 'PARTIELLEMENT_PAYEE', 'PAYEE', 'ANNULEE'
     montant_ht NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
     montant_tva NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
     montant_ttc NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
@@ -289,21 +382,22 @@ CREATE TABLE facture_client (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Règlements / Paiements Clients
+-- Règlements Clients (Rattachés à une Caisse / Banque / Mvola)
 CREATE TABLE paiement_vente (
     id SERIAL PRIMARY KEY,
-    numero_paiement VARCHAR(50) NOT NULL UNIQUE,
+    numero_paiement VARCHAR(50) NOT NULL UNIQUE,   -- ex: PV-2026-0001
     id_facture_client INT NOT NULL REFERENCES facture_client(id) ON DELETE RESTRICT,
+    id_caisse INT NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,             -- Caisse créditée
+    id_mode_paiement INT NOT NULL REFERENCES mode_paiement(id) ON DELETE RESTRICT,
     date_paiement DATE NOT NULL DEFAULT CURRENT_DATE,
     montant NUMERIC(15, 2) NOT NULL CHECK (montant > 0),
-    mode_paiement VARCHAR(50) NOT NULL, -- 'ESPECES', 'CHEQUE', 'VIREMENT', 'MOBILE_MONEY', 'CARTE'
-    reference_transaction VARCHAR(100),
+    reference_transaction VARCHAR(100),            -- ex: Référence Mvola / bordereau remise chèque
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
--- 5. GESTION DES STOCKS & MOUVEMENTS
+-- 6. GESTION DES STOCKS & MOUVEMENTS
 -- -----------------------------------------------------------------------------
 
 -- Situation de stock en temps réel par Dépôt et Article
@@ -313,7 +407,7 @@ CREATE TABLE stock_depot (
     id_article INT NOT NULL REFERENCES article(id) ON DELETE CASCADE,
     quantite_reelle NUMERIC(15, 3) NOT NULL DEFAULT 0.000,      -- Stock physique présent
     quantite_reservee NUMERIC(15, 3) NOT NULL DEFAULT 0.000,    -- Réservé sur commandes clients validées
-    quantite_en_commande NUMERIC(15, 3) NOT NULL DEFAULT 0.000, -- En commande chez fournisseur
+    quantite_en_commande NUMERIC(15, 3) NOT NULL DEFAULT 0.000, -- En cours d'achat chez fournisseur
     derniere_mise_a_jour TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_depot_article UNIQUE (id_depot, id_article)
 );
@@ -323,24 +417,77 @@ CREATE TABLE mouvement_stock (
     id SERIAL PRIMARY KEY,
     id_depot INT NOT NULL REFERENCES depot(id) ON DELETE RESTRICT,
     id_article INT NOT NULL REFERENCES article(id) ON DELETE RESTRICT,
-    type_mouvement VARCHAR(50) NOT NULL, -- 'ENTREE_ACHAT', 'SORTIE_VENTE', 'AJUSTEMENT_POSITIF', 'AJUSTEMENT_NEGATIF', 'TRANSFERT_ENTREE', 'TRANSFERT_SORTIE', 'RETOUR_CLIENT', 'RETOUR_FOURNISSEUR'
-    quantite NUMERIC(15, 3) NOT NULL,    -- Valeur absolue déplacée
+    id_type_mouvement INT NOT NULL REFERENCES type_mouvement_stock(id) ON DELETE RESTRICT,
+    quantite NUMERIC(15, 3) NOT NULL CHECK (quantite > 0),       -- Quantité déplacée
     prix_unitaire NUMERIC(15, 2) DEFAULT 0.00,
     stock_avant NUMERIC(15, 3) NOT NULL,
     stock_apres NUMERIC(15, 3) NOT NULL,
-    reference_document VARCHAR(100),      -- Ex: 'BRA-2026-0001', 'BLV-2026-0001', 'INV-2026-09'
+    reference_document VARCHAR(100),                              -- Ex: 'BRA-2026-0001', 'BLV-2026-0001'
     date_mouvement TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     remarque TEXT
 );
 
 -- -----------------------------------------------------------------------------
--- 6. INDEX DE PERFORMANCE
+-- 7. INDEX DE PERFORMANCE
 -- -----------------------------------------------------------------------------
 CREATE INDEX idx_article_categorie ON article(id_categorie);
 CREATE INDEX idx_article_reference ON article(reference);
 CREATE INDEX idx_stock_depot_article ON stock_depot(id_depot, id_article);
 CREATE INDEX idx_mvt_stock_article_depot ON mouvement_stock(id_article, id_depot);
 CREATE INDEX idx_cmd_achat_fournisseur ON commande_achat(id_fournisseur);
+CREATE INDEX idx_cmd_achat_statut ON commande_achat(id_statut);
 CREATE INDEX idx_cmd_vente_client ON commande_vente(id_client);
-CREATE INDEX idx_facture_fournisseur_statut ON facture_fournisseur(statut_facture);
-CREATE INDEX idx_facture_client_statut ON facture_client(statut_facture);
+CREATE INDEX idx_cmd_vente_statut ON commande_vente(id_statut);
+CREATE INDEX idx_facture_fournisseur_statut ON facture_fournisseur(id_statut);
+CREATE INDEX idx_facture_client_statut ON facture_client(id_statut);
+CREATE INDEX idx_mouvement_caisse_caisse ON mouvement_caisse(id_caisse);
+CREATE INDEX idx_paiement_vente_caisse ON paiement_vente(id_caisse);
+CREATE INDEX idx_paiement_achat_caisse ON paiement_achat(id_caisse);
+
+-- -----------------------------------------------------------------------------
+-- 8. DONNÉES INITIALES (SEEDING DE BASE)
+-- -----------------------------------------------------------------------------
+
+-- Statuts standardisés selon votre convention
+INSERT INTO statut (numero, code, libelle, description) VALUES
+(1,  'CREE',      'Créé / Brouillon',       'Document initié mais non encore validé'),
+(11, 'VALIDE',    'Validé',                 'Document confirmé et actif'),
+(21, 'ANNULE',    'Annulé',                 'Document annulé sans effet opérationnel'),
+(31, 'PARTIEL',   'Partiellement traité',   'Partiellement reçu, livré ou payé'),
+(41, 'SOLDE',     'Soldé / Clôturé',        'Totalement traité, livré ou soldé');
+
+-- Modes de paiement usuels
+INSERT INTO mode_paiement (code, libelle) VALUES
+('ESPECES',      'Espèces / Cash'),
+('VIREMENT',     'Virement Bancaire'),
+('CHEQUE',       'Chèque'),
+('MVOLA',        'Mvola'),
+('ORANGE_MONEY', 'Orange Money'),
+('AIRTEL_MONEY', 'Airtel Money'),
+('CARTE',        'Carte Bancaire');
+
+-- Types de caisses / comptes
+INSERT INTO type_caisse (code, libelle) VALUES
+('CAISSE_PHYSIQUE', 'Caisse Physique / Espèces'),
+('BANQUE',          'Compte Bancaire'),
+('MOBILE_MONEY',    'Compte Mobile Money');
+
+-- Types de mouvements de stock (+1: Entrée, -1: Sortie)
+INSERT INTO type_mouvement_stock (code, libelle, sens) VALUES
+('ENTREE_ACHAT',         'Entrée Réception Achat',       1),
+('SORTIE_VENTE',         'Sortie Livraison Vente',      -1),
+('AJUSTEMENT_POSITIF',   'Ajustement Inventaire Positif', 1),
+('AJUSTEMENT_NEGATIF',   'Ajustement Inventaire Négatif', -1),
+('TRANSFERT_ENTREE',     'Transfert Dépôt Entrant',       1),
+('TRANSFERT_SORTIE',     'Transfert Dépôt Sortant',      -1),
+('RETOUR_CLIENT',        'Retour Produit Client',         1),
+('RETOUR_FOURNISSEUR',   'Retour Produit Fournisseur',   -1);
+
+-- Types de mouvements de caisse (+1: Entrée d'argent, -1: Sortie d'argent)
+INSERT INTO type_mouvement_caisse (code, libelle, sens) VALUES
+('ENCAISSEMENT_VENTE',       'Encaissement Règlement Client',       1),
+('DECAISSEMENT_ACHAT',       'Décaissement Règlement Fournisseur', -1),
+('TRANSFERT_INTERNE_DEBIT',  'Transfert Interne (Sortie caisse)',   -1),
+('TRANSFERT_INTERNE_CREDIT', 'Transfert Interne (Entrée caisse)',    1),
+('DEPENSE_DIVERSE',          'Dépense Diverse / Charge',            -1),
+('APPORT_FONDS',             'Apport de Fonds / Alimentation',       1);
