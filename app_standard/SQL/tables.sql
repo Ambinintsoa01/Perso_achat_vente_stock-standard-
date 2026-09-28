@@ -28,7 +28,8 @@ CREATE TABLE mode_paiement (
 -- Types de caisse / compte de trésorerie
 CREATE TABLE type_caisse (
     id SERIAL PRIMARY KEY,
-    code VARCHAR(50) NOT NULL UNIQUE,  -- 'CAISSE_PHYSIQUE', 'BANQUE', 'MOBILE_MONEY'
+    numero INT NOT NULL UNIQUE,  -- 1: 'CAISSE_PHYSIQUE', 11: 'BANQUE', 21: 'MOBILE_MONEY'
+    code VARCHAR(50) NOT NULL UNIQUE,
     libelle VARCHAR(100) NOT NULL
 );
 
@@ -51,6 +52,20 @@ CREATE TABLE type_mouvement_caisse (
     sens INT NOT NULL CHECK (sens IN (1, -1)), -- +1: Entrée d'argent, -1: Sortie d'argent
     actif BOOLEAN DEFAULT TRUE
 );
+
+-- Type de client
+CREATE TABLE type_client (
+    id SERIAL PRIMARY KEY,
+    numero INT NOT NULl UNIQUE,   -- 1: PARTICULIER, 11: ENTREPRISE, 21: AUTRE
+    code VARCHAR(50) NOT NULL UNIQUE,
+    libelle VARCHAR (100) NOT NULL
+)
+
+-- Devise monnaie
+CREATE TABLE devise (
+    id SERIAL PRIMARY KEY,
+    libelle VARCHAR (10) NOT NULL
+)
 
 -- Catégories d'articles (avec support hiérarchique)
 CREATE TABLE categorie (
@@ -124,7 +139,7 @@ CREATE TABLE client (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
     nom_complet VARCHAR(255) NOT NULL,
-    type_client VARCHAR(50) DEFAULT 'PARTICULIER',
+    id_type_client INT NOT NULL,
     telephone VARCHAR(50),
     email VARCHAR(150),
     adresse TEXT,
@@ -150,7 +165,7 @@ CREATE TABLE caisse (
     numero_compte VARCHAR(100),                    -- IBAN, RIB ou numéro mobile money
     solde_initial NUMERIC(15, 2) DEFAULT 0.00,
     solde_actuel NUMERIC(15, 2) DEFAULT 0.00,
-    devise VARCHAR(10) DEFAULT 'MGA',
+    id_devise INT NOT NULL,
     actif BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
