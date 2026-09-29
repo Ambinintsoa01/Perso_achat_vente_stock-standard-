@@ -1,3 +1,6 @@
+import 'package:app_standard/models/profil.dart';
+import 'package:app_standard/models/utilisateur.dart';
+import 'package:app_standard/services/auth_service.dart';
 import 'package:app_standard/screens/sync/supabase_config_dialog.dart';
 import 'package:app_standard/screens/sync/supabase_sync_dialog.dart';
 import 'package:app_standard/services/supabase_sync_service.dart';
@@ -189,6 +192,101 @@ void main() {
 
       // Erreur de validation affichée
       expect(find.text('L\'URL Supabase est requise'), findsOneWidget);
+    });
+
+    test('Permissions RBAC : Caissier peut seulement PUSH, pas PULL', () {
+      const profilCaissier = Profil(
+        id: 2,
+        numero: 11,
+        code: 'CAISSIER',
+        libelle: 'Caissier(e)',
+      );
+      expect(profilCaissier.canSyncPush, isTrue);
+      expect(profilCaissier.canSyncPull, isFalse);
+      expect(profilCaissier.canSyncBidirectional, isFalse);
+
+      const profilAdmin = Profil(
+        id: 1,
+        numero: 1,
+        code: 'ADMIN',
+        libelle: 'Administrateur',
+      );
+      expect(profilAdmin.canSyncPush, isTrue);
+      expect(profilAdmin.canSyncPull, isTrue);
+      expect(profilAdmin.canSyncBidirectional, isTrue);
+
+      const profilGerant = Profil(
+        id: 4,
+        numero: 31,
+        code: 'GERANT',
+        libelle: 'Gérant',
+      );
+      expect(profilGerant.canSyncPush, isTrue);
+      expect(profilGerant.canSyncPull, isTrue);
+
+      const profilMagasinier = Profil(
+        id: 3,
+        numero: 21,
+        code: 'MAGASINIER',
+        libelle: 'Magasinier',
+      );
+      expect(profilMagasinier.canSyncPush, isTrue);
+      expect(profilMagasinier.canSyncPull, isTrue);
+    });
+
+    test('SupabaseSyncService: sanitizeRowForSqlite convertit les booléens JSON en 1/0 SQLite', () {
+      final service = SupabaseSyncService.instance;
+      final raw = {
+        'id': 10,
+        'nom': 'Produit',
+        'actif': true,
+        'suivi_stock': false,
+        'quantite': 15,
+      };
+
+      final sanitized = service.sanitizeRowForSqlite('article', raw);
+      expect(sanitized['actif'], 1);
+      expect(sanitized['suivi_stock'], 0);
+      expect(sanitized['quantite'], 15);
+    });
+
+    test('pullAll et syncBidirectional lèvent une exception si l\'utilisateur est Caissier', () async {
+      final auth = AuthService.instance;
+      // Connecter un caissier
+      auth.setCurrentUserForTesting(
+        const Utilisateur(
+          id: 2,
+          idProfil: 2,
+          profilCode: 'CAISSIER',
+          profilLibelle: 'Caissier(e)',
+          nom: 'Rasoa',
+          nomUtilisateur: 'caissier',
+          motDePasseHash: 'caissier123',
+        ),
+      );
+
+      final service = SupabaseSyncService.instance;
+
+      expect(
+        () => service.pullAll(),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('Action non autorisée : Le profil Caissier'),
+        )),
+      );
+
+      expect(
+        () => service.syncBidirectional(),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('Action non autorisée : Le profil Caissier'),
+        )),
+      );
+
+      // Déconnecter
+      auth.setCurrentUserForTesting(null);
     });
   });
 }

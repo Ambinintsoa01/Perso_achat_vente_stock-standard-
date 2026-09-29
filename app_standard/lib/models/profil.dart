@@ -38,6 +38,10 @@ class Profil {
   bool get canValiderPaiement => isAdmin || isGerant || isCaissier;
   bool get canGererMouvementsStock => isAdmin || isGerant || isMagasinier;
   bool get canGererInventaire => isAdmin || isGerant || isMagasinier;
+  // Actions de synchronisation Cloud Supabase
+  bool get canSyncPush => true; // Tous les profils peuvent envoyer leurs données
+  bool get canSyncPull => !isCaissier; // Le caissier ne peut que push (pas de téléchargement)
+  bool get canSyncBidirectional => !isCaissier;
 
   factory Profil.fromMap(Map<String, dynamic> map) {
     return Profil(

@@ -70,6 +70,9 @@ class Utilisateur {
   bool get canValiderPaiement => profil.canValiderPaiement;
   bool get canGererMouvementsStock => profil.canGererMouvementsStock;
   bool get canGererInventaire => profil.canGererInventaire;
+  bool get canSyncPush => profil.canSyncPush;
+  bool get canSyncPull => profil.canSyncPull;
+  bool get canSyncBidirectional => profil.canSyncBidirectional;
 
   factory Utilisateur.fromMap(Map<String, dynamic> map) {
     return Utilisateur(

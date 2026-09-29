@@ -6,12 +6,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../database/db_helper.dart';
 
+import 'auth_service.dart';
+
+/// Direction de la synchronisation
+enum SyncDirection {
+  push,          // Envoi local (SQLite) -> Supabase (Tous, y compris Caissier)
+  pull,          // Téléchargement Supabase -> local (SQLite) (Interdit au Caissier)
+  bidirectional, // Envoi puis Téléchargement (Interdit au Caissier)
+}
+
 class SyncProgress {
   final String tableName;
   final int step;
   final int totalSteps;
   final double percentage;
   final String message;
+  final SyncDirection direction;
 
   const SyncProgress({
     required this.tableName,
@@ -19,12 +29,16 @@ class SyncProgress {
     required this.totalSteps,
     required this.percentage,
     required this.message,
+    this.direction = SyncDirection.push,
   });
 }
 
 class SyncResult {
   final bool isSuccess;
   final int totalRowsSynced;
+  final int totalRowsPushed;
+  final int totalRowsPulled;
+  final SyncDirection direction;
   final Map<String, int> rowsPerTable;
   final Map<String, String> errorsPerTable;
   final DateTime startedAt;
@@ -34,6 +48,9 @@ class SyncResult {
   SyncResult({
     required this.isSuccess,
     required this.totalRowsSynced,
+    this.totalRowsPushed = 0,
+    this.totalRowsPulled = 0,
+    this.direction = SyncDirection.push,
     required this.rowsPerTable,
     required this.errorsPerTable,
     required this.startedAt,
@@ -310,6 +327,17 @@ class SupabaseSyncService extends ChangeNotifier {
     return row;
   }
 
+  /// Prépare une ligne Supabase / PostgreSQL pour insertion dans SQLite local
+  Map<String, dynamic> sanitizeRowForSqlite(String table, Map<String, dynamic> raw) {
+    final Map<String, dynamic> row = Map<String, dynamic>.from(raw);
+    row.forEach((key, value) {
+      if (value is bool) {
+        row[key] = value ? 1 : 0;
+      }
+    });
+    return row;
+  }
+
   /// Requête SQL pour charger les lignes d'une table avec l'ordre adéquat
   String getTableSelectQuery(String table) {
     if (table == 'categorie') {
@@ -318,18 +346,10 @@ class SupabaseSyncService extends ChangeNotifier {
     return 'SELECT * FROM $table ORDER BY id ASC';
   }
 
-  /// Synchronisation complète de toutes les tables SQLite vers Supabase
-  Future<SyncResult> syncAll({
+  /// Exécution interne de l'envoi SQLite -> Supabase
+  Future<SyncResult> _pushInternal({
     void Function(SyncProgress progress)? onProgress,
   }) async {
-    if (_isSyncing) {
-      throw Exception('Une synchronisation est déjà en cours.');
-    }
-
-    _isSyncing = true;
-    _currentProgress = null;
-    notifyListeners();
-
     final startedAt = DateTime.now();
     final Map<String, int> rowsPerTable = {};
     final Map<String, String> errorsPerTable = {};
@@ -340,7 +360,6 @@ class SupabaseSyncService extends ChangeNotifier {
       final client = await getOrInitClient();
       final Database db = await DbHelper.instance.database;
 
-      // Détecter les tables existantes dans la base SQLite locale
       final tablesQuery = await db.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
       );
@@ -361,7 +380,8 @@ class SupabaseSyncService extends ChangeNotifier {
           step: step + 1,
           totalSteps: totalSteps,
           percentage: progressPct,
-          message: 'Synchronisation de $table (${step + 1}/$totalSteps)...',
+          direction: SyncDirection.push,
+          message: 'Envoi de $table vers le Cloud (${step + 1}/$totalSteps)...',
         );
 
         _currentProgress = progress;
@@ -377,7 +397,6 @@ class SupabaseSyncService extends ChangeNotifier {
 
           final sanitized = rows.map((r) => sanitizeRow(table, r)).toList();
 
-          // Envoi par paquets de 100 enregistrements
           const int batchSize = 100;
           for (var i = 0; i < sanitized.length; i += batchSize) {
             final chunk = sanitized.sublist(
@@ -390,46 +409,275 @@ class SupabaseSyncService extends ChangeNotifier {
           rowsPerTable[table] = sanitized.length;
           totalRows += sanitized.length;
         } catch (e) {
-          debugPrint('Erreur synchro table $table: $e');
+          debugPrint('Erreur push table $table: $e');
           errorsPerTable[table] = e.toString();
         }
       }
     } catch (e) {
-      debugPrint('Erreur globale de synchronisation: $e');
+      debugPrint('Erreur globale push: $e');
       globalError = e.toString();
-    } finally {
-      final completedAt = DateTime.now();
-      final isSuccess = (globalError == null && errorsPerTable.isEmpty);
-
-      _lastResult = SyncResult(
-        isSuccess: isSuccess,
-        totalRowsSynced: totalRows,
-        rowsPerTable: rowsPerTable,
-        errorsPerTable: errorsPerTable,
-        startedAt: startedAt,
-        completedAt: completedAt,
-        globalError: globalError,
-      );
-
-      _lastSyncDate = completedAt;
-      _lastSyncSuccess = isSuccess;
-      _lastSyncRowCount = totalRows;
-      _isSyncing = false;
-      _currentProgress = null;
-
-      // Sauvegarder dans SharedPreferences
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_prefLastSyncDateKey, completedAt.toIso8601String());
-        await prefs.setBool(_prefLastSyncSuccessKey, isSuccess);
-        await prefs.setInt(_prefLastSyncRowCountKey, totalRows);
-      } catch (e) {
-        debugPrint('Erreur sauvegarde état synchro: $e');
-      }
-
-      notifyListeners();
     }
 
-    return _lastResult!;
+    final completedAt = DateTime.now();
+    final isSuccess = (globalError == null && errorsPerTable.isEmpty);
+
+    return SyncResult(
+      isSuccess: isSuccess,
+      totalRowsSynced: totalRows,
+      totalRowsPushed: totalRows,
+      direction: SyncDirection.push,
+      rowsPerTable: rowsPerTable,
+      errorsPerTable: errorsPerTable,
+      startedAt: startedAt,
+      completedAt: completedAt,
+      globalError: globalError,
+    );
+  }
+
+  /// Exécution interne du téléchargement Supabase -> SQLite
+  Future<SyncResult> _pullInternal({
+    void Function(SyncProgress progress)? onProgress,
+  }) async {
+    final startedAt = DateTime.now();
+    final Map<String, int> rowsPerTable = {};
+    final Map<String, String> errorsPerTable = {};
+    int totalRows = 0;
+    String? globalError;
+
+    try {
+      final client = await getOrInitClient();
+      final Database db = await DbHelper.instance.database;
+
+      // Désactiver temporairement les contraintes de clés étrangères pour l'insertion en masse
+      await db.execute('PRAGMA foreign_keys = OFF;');
+
+      final tablesQuery = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+      );
+      final existingTables = tablesQuery.map((r) => r['name'] as String).toSet();
+
+      final List<String> tablesToSync = orderedTables
+          .where((t) => existingTables.contains(t))
+          .toList();
+
+      final totalSteps = tablesToSync.length;
+
+      for (int step = 0; step < totalSteps; step++) {
+        final table = tablesToSync[step];
+        final progressPct = (step + 1) / totalSteps;
+
+        final progress = SyncProgress(
+          tableName: table,
+          step: step + 1,
+          totalSteps: totalSteps,
+          percentage: progressPct,
+          direction: SyncDirection.pull,
+          message: 'Téléchargement de $table depuis le Cloud (${step + 1}/$totalSteps)...',
+        );
+
+        _currentProgress = progress;
+        onProgress?.call(progress);
+        notifyListeners();
+
+        try {
+          final columnsInfo = await db.rawQuery('PRAGMA table_info($table)');
+          final validColumns = columnsInfo.map((r) => r['name'] as String).toSet();
+
+          final response = await client.from(table).select();
+          final List<dynamic> records = response as List<dynamic>;
+
+          if (records.isEmpty) {
+            rowsPerTable[table] = 0;
+            continue;
+          }
+
+          final batch = db.batch();
+          for (final item in records) {
+            final row = sanitizeRowForSqlite(table, item as Map<String, dynamic>);
+            row.removeWhere((col, _) => !validColumns.contains(col));
+            batch.insert(
+              table,
+              row,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+          await batch.commit(noResult: true);
+
+          rowsPerTable[table] = records.length;
+          totalRows += records.length;
+        } catch (e) {
+          debugPrint('Erreur pull table $table: $e');
+          errorsPerTable[table] = e.toString();
+        }
+      }
+
+      await db.execute('PRAGMA foreign_keys = ON;');
+    } catch (e) {
+      debugPrint('Erreur globale pull: $e');
+      globalError = e.toString();
+    }
+
+    final completedAt = DateTime.now();
+    final isSuccess = (globalError == null && errorsPerTable.isEmpty);
+
+    return SyncResult(
+      isSuccess: isSuccess,
+      totalRowsSynced: totalRows,
+      totalRowsPulled: totalRows,
+      direction: SyncDirection.pull,
+      rowsPerTable: rowsPerTable,
+      errorsPerTable: errorsPerTable,
+      startedAt: startedAt,
+      completedAt: completedAt,
+      globalError: globalError,
+    );
+  }
+
+  /// Sauvegarde le résultat de synchronisation dans SharedPreferences
+  Future<void> _persistSyncState(SyncResult result) async {
+    _lastResult = result;
+    _lastSyncDate = result.completedAt;
+    _lastSyncSuccess = result.isSuccess;
+    _lastSyncRowCount = result.totalRowsSynced;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefLastSyncDateKey, result.completedAt.toIso8601String());
+      await prefs.setBool(_prefLastSyncSuccessKey, result.isSuccess);
+      await prefs.setInt(_prefLastSyncRowCountKey, result.totalRowsSynced);
+    } catch (e) {
+      debugPrint('Erreur sauvegarde état synchro: $e');
+    }
+  }
+
+  /// Envoi complet de toutes les tables SQLite vers Supabase (Push)
+  /// Autorisé pour TOUS les profils (y compris Caissier)
+  Future<SyncResult> pushAll({
+    void Function(SyncProgress progress)? onProgress,
+  }) async {
+    if (_isSyncing) {
+      throw Exception('Une synchronisation est déjà en cours.');
+    }
+
+    _isSyncing = true;
+    _currentProgress = null;
+    notifyListeners();
+
+    try {
+      final result = await _pushInternal(onProgress: onProgress);
+      await _persistSyncState(result);
+      return result;
+    } finally {
+      _isSyncing = false;
+      _currentProgress = null;
+      notifyListeners();
+    }
+  }
+
+  /// Alias de compatibilité ascendante pour l'envoi complet
+  Future<SyncResult> syncAll({
+    void Function(SyncProgress progress)? onProgress,
+  }) => pushAll(onProgress: onProgress);
+
+  /// Téléchargement des données de Supabase vers SQLite local (Pull)
+  /// RESTRICTION MÉTIER STRICTE : Le profil Caissier ne peut PAS effectuer de pull !
+  Future<SyncResult> pullAll({
+    void Function(SyncProgress progress)? onProgress,
+    bool enforcePermissions = true,
+  }) async {
+    if (enforcePermissions) {
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser != null && currentUser.isCaissier) {
+        throw Exception(
+          'Action non autorisée : Le profil Caissier est configuré pour l\'envoi uniquement (Push).',
+        );
+      }
+    }
+
+    if (_isSyncing) {
+      throw Exception('Une synchronisation est déjà en cours.');
+    }
+
+    _isSyncing = true;
+    _currentProgress = null;
+    notifyListeners();
+
+    try {
+      final result = await _pullInternal(onProgress: onProgress);
+      await _persistSyncState(result);
+      return result;
+    } finally {
+      _isSyncing = false;
+      _currentProgress = null;
+      notifyListeners();
+    }
+  }
+
+  /// Synchronisation bidirectionnelle : Envoi (Push) puis Téléchargement (Pull)
+  /// RESTRICTION MÉTIER STRICTE : Le profil Caissier ne peut PAS effectuer de pull !
+  Future<SyncResult> syncBidirectional({
+    void Function(SyncProgress progress)? onProgress,
+    bool enforcePermissions = true,
+  }) async {
+    if (enforcePermissions) {
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser != null && currentUser.isCaissier) {
+        throw Exception(
+          'Action non autorisée : Le profil Caissier est configuré pour l\'envoi uniquement (Push).',
+        );
+      }
+    }
+
+    if (_isSyncing) {
+      throw Exception('Une synchronisation est déjà en cours.');
+    }
+
+    _isSyncing = true;
+    _currentProgress = null;
+    notifyListeners();
+
+    try {
+      final startedAt = DateTime.now();
+
+      // 1. Envoi des modifications locales vers Supabase
+      final pushResult = await _pushInternal(onProgress: onProgress);
+
+      // 2. Téléchargement des nouveautés depuis Supabase
+      final pullResult = await _pullInternal(onProgress: onProgress);
+
+      final completedAt = DateTime.now();
+      final combinedRows = <String, int>{};
+      pushResult.rowsPerTable.forEach((k, v) => combinedRows[k] = v);
+      pullResult.rowsPerTable.forEach((k, v) {
+        combinedRows[k] = (combinedRows[k] ?? 0) + v;
+      });
+
+      final combinedErrors = <String, String>{};
+      combinedErrors.addAll(pushResult.errorsPerTable);
+      combinedErrors.addAll(pullResult.errorsPerTable);
+
+      final isSuccess = pushResult.isSuccess && pullResult.isSuccess;
+      final totalRows = pushResult.totalRowsSynced + pullResult.totalRowsSynced;
+
+      final result = SyncResult(
+        isSuccess: isSuccess,
+        totalRowsSynced: totalRows,
+        totalRowsPushed: pushResult.totalRowsSynced,
+        totalRowsPulled: pullResult.totalRowsSynced,
+        direction: SyncDirection.bidirectional,
+        rowsPerTable: combinedRows,
+        errorsPerTable: combinedErrors,
+        startedAt: startedAt,
+        completedAt: completedAt,
+        globalError: pushResult.globalError ?? pullResult.globalError,
+      );
+
+      await _persistSyncState(result);
+      return result;
+    } finally {
+      _isSyncing = false;
+      _currentProgress = null;
+      notifyListeners();
+    }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../services/auth_service.dart';
 import '../../services/supabase_sync_service.dart';
 import 'supabase_config_dialog.dart';
 
@@ -15,10 +16,15 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
   bool _isConfigured = false;
   String? _url;
   bool _showTableDetails = false;
+  SyncDirection _selectedDirection = SyncDirection.bidirectional;
 
   @override
   void initState() {
     super.initState();
+    final user = AuthService.instance.currentUser;
+    if (user != null && user.isCaissier) {
+      _selectedDirection = SyncDirection.push;
+    }
     _checkConfig();
   }
 
@@ -34,6 +40,10 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
   }
 
   Future<void> _handleStartSync() async {
+    final user = AuthService.instance.currentUser;
+    final isCaissier = user?.isCaissier ?? false;
+    final targetDirection = isCaissier ? SyncDirection.push : _selectedDirection;
+
     final configured = await _syncService.isConfigured();
     if (!configured) {
       if (!mounted) return;
@@ -46,7 +56,13 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
     }
 
     try {
-      await _syncService.syncAll();
+      if (targetDirection == SyncDirection.push) {
+        await _syncService.pushAll();
+      } else if (targetDirection == SyncDirection.pull) {
+        await _syncService.pullAll();
+      } else {
+        await _syncService.syncBidirectional();
+      }
       await _checkConfig();
     } catch (e) {
       debugPrint('Sync dialog error: $e');
@@ -87,6 +103,8 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
         final lastResult = _syncService.lastResult;
         final lastSyncDate = _syncService.lastSyncDate;
         final lastSyncSuccess = _syncService.lastSyncSuccess;
+        final user = AuthService.instance.currentUser;
+        final isCaissier = user?.isCaissier ?? false;
 
         return Dialog(
           backgroundColor: Colors.white,
@@ -274,7 +292,89 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Zone de progression (durant la synchro)
+                  // Sélecteur de mode ou Avertissement RBAC Caissier
+                  if (isCaissier)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.shield_outlined, size: 20, color: Colors.amber.shade900),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              // children: [
+                              //   Text(
+                              //     'Profil Caissier : Envoi uniquement (Push)',
+                              //     style: TextStyle(
+                              //       fontWeight: FontWeight.bold,
+                              //       fontSize: 12,
+                              //       color: Colors.amber.shade900,
+                              //     ),
+                              //   ),
+                              //   const SizedBox(height: 2),
+                              //   Text(
+                              //     'Vos commandes et encaissements sont envoyés vers le Cloud. Le téléchargement depuis le Cloud est réservé à la gérance.',
+                              //     style: TextStyle(
+                              //       fontSize: 11,
+                              //       color: Colors.amber.shade900,
+                              //     ),
+                              //   ),
+                              // ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildDirectionChip(
+                              direction: SyncDirection.bidirectional,
+                              title: 'Complète',
+                              subtitle: 'Push + Pull',
+                              icon: Icons.sync_rounded,
+                              isSyncing: isSyncing,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: _buildDirectionChip(
+                              direction: SyncDirection.push,
+                              title: 'Envoyer',
+                              subtitle: 'Push Cloud',
+                              icon: Icons.cloud_upload_outlined,
+                              isSyncing: isSyncing,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: _buildDirectionChip(
+                              direction: SyncDirection.pull,
+                              title: 'Recevoir',
+                              subtitle: 'Pull Cloud',
+                              icon: Icons.cloud_download_outlined,
+                              isSyncing: isSyncing,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (isSyncing) ...[
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -385,7 +485,7 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
                                 const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
-                                    '${lastResult.totalRowsSynced} enregistrement(s) envoyé(s)',
+                                    _formatSyncSummary(lastResult),
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -522,11 +622,9 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
                                     height: 16,
                                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                   )
-                                : const Icon(Icons.sync_rounded, size: 18),
+                                : Icon(_getActionButtonIcon(isCaissier), size: 18),
                             label: Text(
-                              isSyncing
-                                  ? 'Synchronisation...'
-                                  : (_isConfigured ? 'Synchroniser maintenant' : 'Configurer & Synchroniser'),
+                              _getActionButtonLabel(isSyncing, _isConfigured, isCaissier),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.black,
@@ -546,5 +644,91 @@ class _SupabaseSyncDialogState extends State<SupabaseSyncDialog> {
         );
       },
     );
+  }
+
+  Widget _buildDirectionChip({
+    required SyncDirection direction,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSyncing,
+  }) {
+    final isSelected = _selectedDirection == direction;
+    return InkWell(
+      onTap: isSyncing ? null : () => setState(() => _selectedDirection = direction),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : Colors.black87,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 9,
+                color: isSelected ? Colors.white70 : Colors.black54,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatSyncSummary(SyncResult res) {
+    switch (res.direction) {
+      case SyncDirection.push:
+        return '${res.totalRowsSynced} enregistrement(s) envoyé(s)';
+      case SyncDirection.pull:
+        return '${res.totalRowsSynced} enregistrement(s) téléchargé(s)';
+      case SyncDirection.bidirectional:
+        return '${res.totalRowsSynced} enregistrement(s) synchronisé(s) (${res.totalRowsPushed} ↑, ${res.totalRowsPulled} ↓)';
+    }
+  }
+
+  IconData _getActionButtonIcon(bool isCaissier) {
+    if (isCaissier) return Icons.cloud_upload_rounded;
+    switch (_selectedDirection) {
+      case SyncDirection.bidirectional:
+        return Icons.sync_rounded;
+      case SyncDirection.push:
+        return Icons.cloud_upload_rounded;
+      case SyncDirection.pull:
+        return Icons.cloud_download_rounded;
+    }
+  }
+
+  String _getActionButtonLabel(bool isSyncing, bool isConfigured, bool isCaissier) {
+    if (isSyncing) return 'Synchronisation...';
+    if (!isConfigured) return 'Configurer & Synchroniser';
+    if (isCaissier) return 'Envoyer ';
+    switch (_selectedDirection) {
+      case SyncDirection.bidirectional:
+        return 'Synchroniser';
+      case SyncDirection.push:
+        return 'Envoyer';
+      case SyncDirection.pull:
+        return 'Télécharger';
+    }
   }
 }
