@@ -7,6 +7,7 @@ import '../../services/achat_service.dart';
 import '../../services/caisse_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/date_filter_bar.dart';
+import '../../widgets/user_avatar_button.dart';
 import 'nouvel_achat_screen.dart';
 import 'widgets/commande_achat_card.dart';
 import 'widgets/nouveau_fournisseur_dialog.dart';
@@ -128,7 +129,7 @@ class _AchatScreenState extends State<AchatScreen> {
             icon: const Icon(Icons.add_rounded, size: 24),
             onPressed: _ouvrirNouvelAchat,
           ),
-          const SizedBox(width: 8),
+          const UserAvatarButton(),
         ],
       ),
       body: _isLoading

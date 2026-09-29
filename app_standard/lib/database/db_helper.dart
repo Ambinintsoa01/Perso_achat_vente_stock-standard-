@@ -609,5 +609,43 @@ class DbHelper {
         ('CLI-001', 'Client Comptoir (Passage)', 1, '034 00 000 00', 'client@passage.mg')
       ''');
     }
+
+    // Assurer l'existence des profils standard dans le SQL
+    await db.rawInsert('''
+      INSERT OR IGNORE INTO profil (numero, code, libelle, description) VALUES
+      (1, 'ADMIN', 'Administrateur', 'Accès complet à tous les modules'),
+      (11, 'CAISSIER', 'Caissier(e)', 'Gestion des ventes et de la caisse'),
+      (21, 'MAGASINIER', 'Magasinier', 'Gestion des stocks et approvisionnements'),
+      (31, 'GERANT', 'Gérant / Superviseur', 'Supervision globale et statistiques')
+    ''');
+
+    // Utilisateurs par défaut pour chaque profil (si non existants)
+    await db.rawInsert('''
+      INSERT OR IGNORE INTO utilisateur (id_profil, nom, prenom, nom_utilisateur, mot_de_passe_hash)
+      SELECT id, 'Admin', 'Système', 'admin', 'admin123' FROM profil WHERE code = 'ADMIN'
+      AND NOT EXISTS (SELECT 1 FROM utilisateur WHERE nom_utilisateur = 'admin')
+      LIMIT 1
+    ''');
+
+    await db.rawInsert('''
+      INSERT OR IGNORE INTO utilisateur (id_profil, nom, prenom, nom_utilisateur, mot_de_passe_hash)
+      SELECT id, 'Rasoa', 'Fanjatiana', 'caissier', 'caissier123' FROM profil WHERE code = 'CAISSIER'
+      AND NOT EXISTS (SELECT 1 FROM utilisateur WHERE nom_utilisateur = 'caissier')
+      LIMIT 1
+    ''');
+
+    await db.rawInsert('''
+      INSERT OR IGNORE INTO utilisateur (id_profil, nom, prenom, nom_utilisateur, mot_de_passe_hash)
+      SELECT id, 'Rakoto', 'Jean', 'magasinier', 'magasinier123' FROM profil WHERE code = 'MAGASINIER'
+      AND NOT EXISTS (SELECT 1 FROM utilisateur WHERE nom_utilisateur = 'magasinier')
+      LIMIT 1
+    ''');
+
+    await db.rawInsert('''
+      INSERT OR IGNORE INTO utilisateur (id_profil, nom, prenom, nom_utilisateur, mot_de_passe_hash)
+      SELECT id, 'Andry', 'Directeur', 'gerant', 'gerant123' FROM profil WHERE code = 'GERANT'
+      AND NOT EXISTS (SELECT 1 FROM utilisateur WHERE nom_utilisateur = 'gerant')
+      LIMIT 1
+    ''');
   }
 }

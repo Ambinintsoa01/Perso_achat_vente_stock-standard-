@@ -6,6 +6,7 @@ import '../../models/mouvement_caisse.dart';
 import '../../services/caisse_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/date_filter_bar.dart';
+import '../../widgets/user_avatar_button.dart';
 import 'widgets/caisse_card.dart';
 import 'widgets/mouvement_item.dart';
 import 'widgets/nouveau_mouvement_dialog.dart';
@@ -151,7 +152,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
             icon: const Icon(Icons.add_rounded, size: 24),
             onPressed: _ouvrirNouveauMouvement,
           ),
-          const SizedBox(width: 8),
+          const UserAvatarButton(),
         ],
       ),
       body: _isLoading

@@ -7,6 +7,7 @@ import '../../services/caisse_service.dart';
 import '../../services/vente_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/date_filter_bar.dart';
+import '../../widgets/user_avatar_button.dart';
 import 'nouvelle_vente_screen.dart';
 import 'widgets/commande_vente_card.dart';
 import 'widgets/encaisser_creance_dialog.dart';
@@ -237,7 +238,7 @@ class _VenteScreenState extends State<VenteScreen> {
             icon: const Icon(Icons.add_shopping_cart_rounded, size: 22),
             onPressed: _ouvrirNouvelleVente,
           ),
-          const SizedBox(width: 8),
+          const UserAvatarButton(),
         ],
       ),
       body: _isLoading

@@ -22,7 +22,7 @@ void main() {
 
   testWidgets('Navigation vers Stats et affichage des indicateurs et graphiques requis', (WidgetTester tester) async {
     await tester.runAsync(() async {
-      await tester.pumpWidget(const AchatVenteStockApp());
+      await tester.pumpWidget(const AchatVenteStockApp(startAuthenticated: true));
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump();

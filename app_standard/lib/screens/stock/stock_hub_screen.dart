@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../models/article.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/user_avatar_button.dart';
 import 'categories_list_screen.dart';
 import 'mouvements_stock_screen.dart';
 import 'produits_list_screen.dart';
@@ -167,7 +168,7 @@ class _StockHubScreenState extends State<StockHubScreen> {
             icon: const Icon(Icons.add_rounded, size: 24),
             onPressed: _ouvrirNouveauProduit,
           ),
-          const SizedBox(width: 8),
+          const UserAvatarButton(),
         ],
       ),
       body: _isLoading

@@ -7,6 +7,7 @@ import '../../services/stats_service.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/date_filter_bar.dart';
+import '../../widgets/user_avatar_button.dart';
 import 'widgets/depenses_visualisation_chart.dart';
 import 'widgets/stats_kpi_card.dart';
 import 'widgets/vente_evolution_chart.dart';
@@ -148,7 +149,7 @@ class _StatsScreenState extends State<StatsScreen> {
             icon: const Icon(Icons.refresh_rounded, size: 22),
             onPressed: _loadData,
           ),
-          const SizedBox(width: 8),
+          const UserAvatarButton(),
         ],
       ),
       body: _isLoading
