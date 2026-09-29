@@ -9,6 +9,7 @@ import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/access_denied_screen.dart';
 import '../../widgets/date_filter_bar.dart';
+import '../../widgets/sync_button.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'widgets/depenses_visualisation_chart.dart';
 import 'widgets/patron_summary_cards.dart';
@@ -164,6 +165,7 @@ class _StatsScreenState extends State<StatsScreen> {
             icon: const Icon(Icons.refresh_rounded, size: 22),
             onPressed: _loadData,
           ),
+          const SyncButton(),
           const UserAvatarButton(),
         ],
       ),

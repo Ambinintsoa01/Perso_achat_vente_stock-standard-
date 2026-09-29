@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/access_denied_screen.dart';
+import '../../widgets/sync_button.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'categories_list_screen.dart';
 import 'mouvements_stock_screen.dart';
@@ -180,6 +181,7 @@ class _StockHubScreenState extends State<StockHubScreen> {
               icon: const Icon(Icons.add_rounded, size: 24),
               onPressed: _ouvrirNouveauProduit,
             ),
+          const SyncButton(),
           const UserAvatarButton(),
         ],
       ),

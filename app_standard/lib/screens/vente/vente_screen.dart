@@ -9,6 +9,7 @@ import '../../services/vente_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/access_denied_screen.dart';
 import '../../widgets/date_filter_bar.dart';
+import '../../widgets/sync_button.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'nouvelle_vente_screen.dart';
 import 'widgets/commande_vente_card.dart';
@@ -248,6 +249,7 @@ class _VenteScreenState extends State<VenteScreen> {
             icon: const Icon(Icons.add_shopping_cart_rounded, size: 22),
             onPressed: _ouvrirNouvelleVente,
           ),
+          const SyncButton(),
           const UserAvatarButton(),
         ],
       ),

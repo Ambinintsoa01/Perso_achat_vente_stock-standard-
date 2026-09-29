@@ -9,17 +9,17 @@
 
 -- Profils d'utilisateurs (Gestion des rôles & droits d'accès)
 CREATE TABLE profil (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     numero INTEGER NOT NULL UNIQUE,     -- 1: ADMIN, 11: CAISSIER, 21: MAGASINIER
     code TEXT NOT NULL UNIQUE,          -- 'ADMIN', 'CAISSIER', 'MAGASINIER'
     libelle TEXT NOT NULL,
     description TEXT,
-    actif INTEGER DEFAULT 1
+    actif BOOLEAN DEFAULT TRUE
 );
 
 -- Table des utilisateurs associés à un profil
 CREATE TABLE utilisateur (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     id_profil INTEGER NOT NULL REFERENCES profil(id) ON DELETE RESTRICT,
     nom TEXT NOT NULL,
     prenom TEXT,
@@ -27,8 +27,8 @@ CREATE TABLE utilisateur (
     telephone TEXT,
     nom_utilisateur TEXT NOT NULL UNIQUE,
     mot_de_passe_hash TEXT NOT NULL,
-    actif INTEGER DEFAULT 1,
-    created_at TEXT DEFAULT (DATETIME('now', 'localtime'))
+    actif BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Table générique des statuts pour les documents (achats, ventes, factures, etc.)
@@ -129,11 +129,14 @@ CREATE TABLE depot (
 CREATE TABLE article (
     id SERIAL PRIMARY KEY,
     reference VARCHAR(50) NOT NULL UNIQUE,
+    code_barre VARCHAR(100) UNIQUE,
     designation VARCHAR(255) NOT NULL,
     description TEXT,
+    image_url TEXT,
     id_categorie INT REFERENCES categorie(id) ON DELETE RESTRICT,
     id_unite INT REFERENCES unite_mesure(id) ON DELETE RESTRICT,
     prix_achat_estime NUMERIC(15, 2) DEFAULT 0.00,
+    cout_moyen_unitaire NUMERIC(15, 2) DEFAULT 0.00,
     prix_vente_standard NUMERIC(15, 2) DEFAULT 0.00,
     taux_tva NUMERIC(5, 2) DEFAULT 20.00,
     seuil_alerte_stock NUMERIC(15, 3) DEFAULT 0.000,

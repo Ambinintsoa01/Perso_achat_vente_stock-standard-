@@ -9,6 +9,7 @@ import '../../services/caisse_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/access_denied_screen.dart';
 import '../../widgets/date_filter_bar.dart';
+import '../../widgets/sync_button.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'widgets/caisse_card.dart';
 import 'widgets/cloturer_caisse_dialog.dart';
@@ -224,6 +225,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
             icon: const Icon(Icons.add_rounded, size: 24),
             onPressed: _ouvrirNouveauMouvement,
           ),
+          const SyncButton(),
           const UserAvatarButton(),
         ],
       ),

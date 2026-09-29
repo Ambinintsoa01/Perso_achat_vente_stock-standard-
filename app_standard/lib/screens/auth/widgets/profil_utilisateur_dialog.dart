@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/utilisateur.dart';
 import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../sync/supabase_sync_dialog.dart';
 
 class ProfilUtilisateurDialog extends StatefulWidget {
   final Utilisateur user;
@@ -251,7 +252,51 @@ class _ProfilUtilisateurDialogState extends State<ProfilUtilisateurDialog> {
                 ),
               ],
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
+
+              // Option Cloud Supabase Sync
+              InkWell(
+                onTap: () {
+                  Navigator.of(context).pop();
+                  showDialog(
+                    context: context,
+                    builder: (_) => const SupabaseSyncDialog(),
+                  );
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.cloud_sync_outlined, size: 20, color: Colors.black87),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Synchronisation Cloud Supabase',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'Synchroniser SQLite avec Supabase',
+                              style: TextStyle(fontSize: 11, color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, size: 18, color: Colors.black45),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
 
               // Bouton Déconnexion
               SizedBox(
