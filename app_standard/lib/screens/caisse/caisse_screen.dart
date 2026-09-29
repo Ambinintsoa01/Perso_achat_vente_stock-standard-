@@ -104,6 +104,24 @@ class _CaisseScreenState extends State<CaisseScreen> {
       }
     }
 
+    // Détection de la caisse sélectionnée
+    Caisse? selectedCaisse;
+    if (_selectedCaisseFilter != null) {
+      try {
+        selectedCaisse = _caisses.firstWhere((c) => c.id == _selectedCaisseFilter);
+      } catch (_) {
+        selectedCaisse = null;
+      }
+    }
+
+    final double montantAffiche = selectedCaisse != null 
+        ? selectedCaisse.soldeActuel 
+        : _totalTresorerie;
+
+    final String titreAffiche = selectedCaisse != null
+        ? 'SOLDE : ${selectedCaisse.nom.toUpperCase()}'
+        : 'DISPONIBLE TOTAL';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -140,7 +158,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // CARTE NOIRE MODERNE : TOTAL TRÉSORERIE DU PATRON
+                    // CARTE NOIRE MODERNE : TOTAL TRÉSORERIE OU SOLDE COMPTE SÉLECTIONNÉ
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(22),
@@ -161,54 +179,131 @@ class _CaisseScreenState extends State<CaisseScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'DISPONIBLE TOTAL',
-                                style: TextStyle(
-                                  color: Colors.white60,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                              Expanded(
                                 child: Text(
-                                  '${_caisses.length} comptes actifs',
+                                  titreAffiche,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white60,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.0,
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
+                              if (selectedCaisse != null)
+                                InkWell(
+                                  onTap: () {
+                                    setState(() => _selectedCaisseFilter = null);
+                                    _loadData();
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.20),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white30),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Voir global',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '${_caisses.length} comptes actifs',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 10),
-                          Text(
-                            currencyFormatter.format(_totalTresorerie),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              currencyFormatter.format(montantAffiche),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 18),
                           const Divider(color: Colors.white24, height: 1),
                           const SizedBox(height: 16),
-                          // Ventilation rapide (Cash vs Mobile Money vs Banque)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildSummaryMiniBadge('Espèces (Cash)', totalCash, Icons.point_of_sale_rounded),
-                              _buildSummaryMiniBadge('Mobile Money', totalMobile, Icons.phone_android_rounded),
-                              _buildSummaryMiniBadge('Banque', totalBanque, Icons.account_balance_rounded),
-                            ],
-                          ),
+                          // Ventilation rapide OU détails du compte sélectionné
+                          if (selectedCaisse != null)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildSummaryMiniBadge(
+                                  title: 'Trésorerie globale',
+                                  amount: _totalTresorerie,
+                                  icon: Icons.account_balance_wallet_rounded,
+                                ),
+                                _buildSummaryMiniBadge(
+                                  title: 'Solde initial',
+                                  amount: selectedCaisse.soldeInitial,
+                                  icon: Icons.history_rounded,
+                                ),
+                                _buildSummaryMiniBadge(
+                                  title: 'Type / Compte',
+                                  valueText: selectedCaisse.numeroCompte?.isNotEmpty == true
+                                      ? selectedCaisse.numeroCompte!
+                                      : (selectedCaisse.typeLibelle ?? selectedCaisse.code),
+                                  icon: Icons.tag_rounded,
+                                ),
+                              ],
+                            )
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildSummaryMiniBadge(
+                                  title: 'Espèces (Cash)',
+                                  amount: totalCash,
+                                  icon: Icons.point_of_sale_rounded,
+                                ),
+                                _buildSummaryMiniBadge(
+                                  title: 'Mobile Money',
+                                  amount: totalMobile,
+                                  icon: Icons.phone_android_rounded,
+                                ),
+                                _buildSummaryMiniBadge(
+                                  title: 'Banque',
+                                  amount: totalBanque,
+                                  icon: Icons.account_balance_rounded,
+                                ),
+                              ],
+                            ),
                           const SizedBox(height: 18),
                           // Boutons d'action rapide sur la carte noire
                           Row(
@@ -419,7 +514,12 @@ class _CaisseScreenState extends State<CaisseScreen> {
     );
   }
 
-  Widget _buildSummaryMiniBadge(String title, double amount, IconData icon) {
+  Widget _buildSummaryMiniBadge({
+    required String title,
+    double? amount,
+    String? valueText,
+    required IconData icon,
+  }) {
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,7 +547,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
-              currencyFormatter.format(amount),
+              valueText ?? (amount != null ? currencyFormatter.format(amount) : '-'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
