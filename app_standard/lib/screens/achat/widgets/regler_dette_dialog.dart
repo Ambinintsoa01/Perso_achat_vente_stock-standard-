@@ -94,24 +94,31 @@ class _ReglerDetteDialogState extends State<ReglerDetteDialog> {
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 440,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Titre et Fermer (fixe en haut)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Régler Dette Fournisseur',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+                  const Expanded(
+                    child: Text(
+                      'Régler Dette Fournisseur',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
@@ -120,101 +127,132 @@ class _ReglerDetteDialogState extends State<ReglerDetteDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              // Récapitulatif dette
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppTheme.dangerBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 8),
+
+              // Contenu défilable
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          widget.commande.fournisseurNom ?? 'Fournisseur',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.danger),
+                        const SizedBox(height: 6),
+
+                        // Récapitulatif dette
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.dangerBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.commande.fournisseurNom ?? 'Fournisseur',
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.danger),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                    Text(
+                                      'Réf: ${widget.commande.numeroCommande}',
+                                      style: const TextStyle(fontSize: 11, color: AppTheme.danger),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text('Reste à payer', style: TextStyle(fontSize: 10, color: AppTheme.danger)),
+                                  Text(
+                                    currencyFormatter.format(widget.commande.resteAPayer),
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.danger),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        Text(
-                          'Réf: ${widget.commande.numeroCommande}',
-                          style: const TextStyle(fontSize: 11, color: AppTheme.danger),
+                        const SizedBox(height: 18),
+
+                        // Caisse débitée
+                        DropdownButtonFormField<int>(
+                          initialValue: _selectedCaisseId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Compte / Caisse à débiter *'),
+                          items: widget.caisses.map((c) {
+                            return DropdownMenuItem<int>(
+                              value: c.id,
+                              child: Text(
+                                '${c.nom} (${currencyFormatter.format(c.soldeActuel)})',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedCaisseId = val);
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Mode de paiement
+                        DropdownButtonFormField<int>(
+                          initialValue: _selectedModePaiementId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Moyen de paiement *'),
+                          items: widget.modesPaiement.map((mp) {
+                            return DropdownMenuItem<int>(
+                              value: mp.id,
+                              child: Text(
+                                mp.libelle,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedModePaiementId = val);
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Montant à payer
+                        TextFormField(
+                          controller: _montantController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Montant à régler *',
+                            suffixText: 'Ar',
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Montant requis';
+                            final parsed = double.tryParse(val.replaceAll(' ', '').replaceAll(',', '.'));
+                            if (parsed == null || parsed <= 0) return 'Montant invalide';
+                            if (parsed > widget.commande.resteAPayer) return 'Dépasse le reste à payer';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 22),
+
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _submit,
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14)),
+                          child: _isLoading
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Confirmer le Règlement', style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('Reste à payer', style: TextStyle(fontSize: 10, color: AppTheme.danger)),
-                        Text(
-                          currencyFormatter.format(widget.commande.resteAPayer),
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.danger),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-
-              // Caisse débitée
-              DropdownButtonFormField<int>(
-                initialValue: _selectedCaisseId,
-                decoration: const InputDecoration(labelText: 'Compte / Caisse à débiter *'),
-                items: widget.caisses.map((c) {
-                  return DropdownMenuItem<int>(
-                    value: c.id,
-                    child: Text('${c.nom} (${c.soldeActuel.toStringAsFixed(0)} Ar)'),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedCaisseId = val);
-                },
-              ),
-              const SizedBox(height: 14),
-
-              // Mode de paiement
-              DropdownButtonFormField<int>(
-                initialValue: _selectedModePaiementId,
-                decoration: const InputDecoration(labelText: 'Moyen de paiement *'),
-                items: widget.modesPaiement.map((mp) {
-                  return DropdownMenuItem<int>(
-                    value: mp.id,
-                    child: Text(mp.libelle),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedModePaiementId = val);
-                },
-              ),
-              const SizedBox(height: 14),
-
-              // Montant à payer
-              TextFormField(
-                controller: _montantController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Montant à régler *',
-                  suffixText: 'Ar',
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Montant requis';
-                  final parsed = double.tryParse(val.replaceAll(' ', '').replaceAll(',', '.'));
-                  if (parsed == null || parsed <= 0) return 'Montant invalide';
-                  if (parsed > widget.commande.resteAPayer) return 'Dépasse le reste à payer';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 22),
-
-              ElevatedButton(
-                onPressed: _isLoading ? null : _submit,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: _isLoading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Confirmer le Règlement', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ],
           ),

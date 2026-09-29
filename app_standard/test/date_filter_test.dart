@@ -87,6 +87,7 @@ void main() {
 
       final expectedMonthStart = DateTime(now.year, now.month, 1);
       expect(receivedStart, equals(expectedMonthStart));
+      expect(receivedEnd, isNotNull);
     });
   });
 

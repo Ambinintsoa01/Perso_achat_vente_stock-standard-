@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../models/caisse.dart';
 import '../../../services/caisse_service.dart';
 import '../../../theme/app_theme.dart';
@@ -89,27 +90,36 @@ class _TransfertInterneDialogState extends State<TransfertInterneDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final currencyFormatter = NumberFormat.decimalPattern('fr_FR');
+
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 440,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Titre et Fermer (fixe en haut)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Virement Interne / Transfert',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+                  const Expanded(
+                    child: Text(
+                      'Virement Interne / Transfert',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
@@ -118,94 +128,121 @@ class _TransfertInterneDialogState extends State<TransfertInterneDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
-              // Caisse Source (Débitée)
-              DropdownButtonFormField<int>(
-                initialValue: _idCaisseSource,
-                decoration: const InputDecoration(labelText: 'Compte Source (Débité) *'),
-                items: widget.caisses.map((c) {
-                  return DropdownMenuItem<int>(
-                    value: c.id,
-                    child: Text('${c.nom} (${c.soldeActuel.toStringAsFixed(0)} Ar)'),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _idCaisseSource = val);
-                },
-              ),
-              const SizedBox(height: 14),
+              // Contenu défilable
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 8),
 
-              // Caisse Destination (Créditée)
-              DropdownButtonFormField<int>(
-                initialValue: _idCaisseDestination,
-                decoration: const InputDecoration(labelText: 'Compte Destination (Crédité) *'),
-                items: widget.caisses.map((c) {
-                  return DropdownMenuItem<int>(
-                    value: c.id,
-                    child: Text('${c.nom} (${c.soldeActuel.toStringAsFixed(0)} Ar)'),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _idCaisseDestination = val);
-                },
-              ),
-              const SizedBox(height: 14),
+                        // Caisse Source (Débitée)
+                        DropdownButtonFormField<int>(
+                          initialValue: _idCaisseSource,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Compte Source (Débité) *'),
+                          items: widget.caisses.map((c) {
+                            return DropdownMenuItem<int>(
+                              value: c.id,
+                              child: Text(
+                                '${c.nom} (${currencyFormatter.format(c.soldeActuel)} Ar)',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _idCaisseSource = val);
+                          },
+                        ),
+                        const SizedBox(height: 14),
 
-              // Montant viré
-              TextFormField(
-                controller: _montantController,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Montant transféré *',
-                  hintText: 'ex: 100 000',
-                  suffixText: 'Ar',
+                        // Caisse Destination (Créditée)
+                        DropdownButtonFormField<int>(
+                          initialValue: _idCaisseDestination,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Compte Destination (Crédité) *'),
+                          items: widget.caisses.map((c) {
+                            return DropdownMenuItem<int>(
+                              value: c.id,
+                              child: Text(
+                                '${c.nom} (${currencyFormatter.format(c.soldeActuel)} Ar)',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _idCaisseDestination = val);
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Montant viré
+                        TextFormField(
+                          controller: _montantController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Montant transféré *',
+                            hintText: 'ex: 100 000',
+                            suffixText: 'Ar',
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Montant requis';
+                            final parsed = double.tryParse(val.replaceAll(' ', '').replaceAll(',', '.'));
+                            if (parsed == null || parsed <= 0) return 'Montant invalide';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Frais de retrait / transfert
+                        TextFormField(
+                          controller: _fraisController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Frais opérateur (ex: Frais retrait MVola)',
+                            hintText: '0 si aucun',
+                            suffixText: 'Ar',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Motif
+                        TextFormField(
+                          controller: _motifController,
+                          decoration: const InputDecoration(
+                            labelText: 'Motif du transfert',
+                            hintText: 'ex: Retrait MVola vers caisse liquide',
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text(
+                                  'Confirmer le Virement',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Montant requis';
-                  final parsed = double.tryParse(val.replaceAll(' ', '').replaceAll(',', '.'));
-                  if (parsed == null || parsed <= 0) return 'Montant invalide';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 14),
-
-              // Frais de retrait / transfert
-              TextFormField(
-                controller: _fraisController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Frais opérateur (ex: Frais retrait MVola)',
-                  hintText: '0 si aucun',
-                  suffixText: 'Ar',
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // Motif
-              TextFormField(
-                controller: _motifController,
-                decoration: const InputDecoration(
-                  labelText: 'Motif du transfert',
-                  hintText: 'ex: Retrait MVola vers caisse liquide',
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              ElevatedButton(
-                onPressed: _isLoading ? null : _submit,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text(
-                        'Confirmer le Virement',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
               ),
             ],
           ),

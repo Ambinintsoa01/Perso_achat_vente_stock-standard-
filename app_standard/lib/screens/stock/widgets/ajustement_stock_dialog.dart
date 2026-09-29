@@ -97,24 +97,31 @@ class _AjustementStockDialogState extends State<AjustementStockDialog> {
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 440,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Titre et Fermer (fixe en haut)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Mouvement de Stock',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+                  const Expanded(
+                    child: Text(
+                      'Mouvement de Stock',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
@@ -123,129 +130,145 @@ class _AjustementStockDialogState extends State<AjustementStockDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
-              // Sélecteur Entrée / Sortie
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isEntree = true),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
+              // Contenu défilable
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 8),
+
+                        // Sélecteur Entrée / Sortie
+                        Container(
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: _isEntree ? Colors.black : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '+ Entrée Stock',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: _isEntree ? Colors.white : AppTheme.textSecondary,
-                            ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _isEntree = true),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _isEntree ? Colors.black : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '+ Entrée Stock',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: _isEntree ? Colors.white : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _isEntree = false),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: !_isEntree ? AppTheme.danger : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '- Sortie Stock',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: !_isEntree ? Colors.white : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isEntree = false),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: !_isEntree ? AppTheme.danger : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
+                        const SizedBox(height: 16),
+
+                        // Sélection Article
+                        DropdownButtonFormField<int>(
+                          initialValue: _selectedArticleId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Article à ajuster'),
+                          items: widget.articles.map((art) {
+                            return DropdownMenuItem<int>(
+                              value: art.id,
+                              child: Text(
+                                '${art.designation} (Reste: ${art.quantiteStock.toStringAsFixed(0)})',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedArticleId = val);
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Quantité
+                        TextFormField(
+                          controller: _quantiteController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantité à ajouter / retirer *',
+                            hintText: 'ex: 10',
                           ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '- Sortie Stock',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: !_isEntree ? Colors.white : AppTheme.textSecondary,
-                            ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Quantité requise';
+                            final parsed = double.tryParse(val.replaceAll(' ', '').replaceAll(',', '.'));
+                            if (parsed == null || parsed <= 0) return 'Quantité invalide';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Motif
+                        TextFormField(
+                          controller: _motifController,
+                          decoration: const InputDecoration(
+                            labelText: 'Motif / Justification',
+                            hintText: 'ex: Réassort, casse, échantillon, correction',
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 22),
+
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isEntree ? Colors.black : AppTheme.danger,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : Text(
+                                  _isEntree ? 'Confirmer l\'Entrée en Stock' : 'Confirmer la Sortie de Stock',
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // Sélection Article
-              DropdownButtonFormField<int>(
-                initialValue: _selectedArticleId,
-                decoration: const InputDecoration(labelText: 'Article à ajuster'),
-                items: widget.articles.map((art) {
-                  return DropdownMenuItem<int>(
-                    value: art.id,
-                    child: Text(
-                      '${art.designation} (Reste: ${art.quantiteStock.toStringAsFixed(0)})',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedArticleId = val);
-                },
-              ),
-              const SizedBox(height: 14),
-
-              // Quantité
-              TextFormField(
-                controller: _quantiteController,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Quantité à ajouter / retirer *',
-                  hintText: 'ex: 10',
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Quantité requise';
-                  final parsed = double.tryParse(val.replaceAll(' ', '').replaceAll(',', '.'));
-                  if (parsed == null || parsed <= 0) return 'Quantité invalide';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 14),
-
-              // Motif
-              TextFormField(
-                controller: _motifController,
-                decoration: const InputDecoration(
-                  labelText: 'Motif / Justification',
-                  hintText: 'ex: Réassort, casse, échantillon, correction',
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              ElevatedButton(
-                onPressed: _isLoading ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isEntree ? Colors.black : AppTheme.danger,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(
-                        _isEntree ? 'Confirmer l\'Entrée en Stock' : 'Confirmer la Sortie de Stock',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
               ),
             ],
           ),
