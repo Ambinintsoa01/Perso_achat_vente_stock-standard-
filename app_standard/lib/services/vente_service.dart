@@ -325,12 +325,16 @@ class VenteService {
         // Mise à jour du solde de caisse (Crédit)
         await txn.update('caisse', {'solde_actuel': soldeApres}, where: 'id = ?', whereArgs: [idCaisse]);
 
+        final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
+        final idJournal = openJc.isNotEmpty ? openJc.first['id'] as int : null;
+
         // Enregistrement MOUVEMENT DE CAISSE (ENCAISSEMENT_VENTE = id 1)
         await txn.insert('mouvement_caisse', {
           'id_caisse': idCaisse,
           'id_type_mouvement': 1, // ENCAISSEMENT_VENTE
           'id_mode_paiement': idModePaiement ?? 1,
           'id_utilisateur': idUtilisateur ?? 1,
+          'id_journal_caisse': idJournal,
           'montant': totalTtc,
           'solde_avant': soldeAvant,
           'solde_apres': soldeApres,
@@ -453,12 +457,16 @@ class VenteService {
 
       final numFacture = facture['numero_facture'] as String;
 
+      final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
+      final idJournal = openJc.isNotEmpty ? openJc.first['id'] as int : null;
+
       // 4. Enregistrement MOUVEMENT DE CAISSE (ENCAISSEMENT_VENTE = id 1)
       await txn.insert('mouvement_caisse', {
         'id_caisse': idCaisse,
         'id_type_mouvement': 1, // ENCAISSEMENT_VENTE
         'id_mode_paiement': idModePaiement,
         'id_utilisateur': idUtilisateur ?? 1,
+        'id_journal_caisse': idJournal,
         'montant': montantRegle,
         'solde_avant': soldeAvant,
         'solde_apres': soldeApres,

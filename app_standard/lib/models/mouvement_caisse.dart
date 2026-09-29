@@ -10,6 +10,7 @@ class MouvementCaisse {
   final String? modePaiementLibelle;
   final int? idUtilisateur;
   final String? utilisateurNom;
+  final int? idJournalCaisse;
   final double montant;
   final double soldeAvant;
   final double soldeApres;
@@ -29,6 +30,7 @@ class MouvementCaisse {
     this.modePaiementLibelle,
     this.idUtilisateur,
     this.utilisateurNom,
+    this.idJournalCaisse,
     required this.montant,
     required this.soldeAvant,
     required this.soldeApres,
@@ -50,6 +52,7 @@ class MouvementCaisse {
       modePaiementLibelle: map['mode_paiement_libelle'] as String?,
       idUtilisateur: map['id_utilisateur'] as int?,
       utilisateurNom: map['utilisateur_nom'] as String?,
+      idJournalCaisse: map['id_journal_caisse'] as int?,
       montant: (map['montant'] as num).toDouble(),
       soldeAvant: (map['solde_avant'] as num).toDouble(),
       soldeApres: (map['solde_apres'] as num).toDouble(),

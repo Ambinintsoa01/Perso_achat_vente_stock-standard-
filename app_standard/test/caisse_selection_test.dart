@@ -35,6 +35,9 @@ void main() {
     final caisseEspeceFinder = find.text('Tiroir-Caisse Espèces');
     expect(caisseEspeceFinder, findsWidgets);
 
+    await tester.ensureVisible(caisseEspeceFinder.first);
+    await tester.pump();
+
     // Cliquer sur la première carte de caisse et attendre le rechargement SQLite
     await tester.runAsync(() async {
       await tester.tap(caisseEspeceFinder.first);
@@ -46,6 +49,9 @@ void main() {
     expect(find.text('SOLDE : TIROIR-CAISSE ESPÈCES'), findsOneWidget);
     expect(find.text('Voir global'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Voir global'));
+    await tester.pump();
+
     // 4. Cliquer sur "Voir global" pour réinitialiser l'affichage
     await tester.runAsync(() async {
       await tester.tap(find.text('Voir global'));
@@ -55,5 +61,10 @@ void main() {
 
     // 5. On doit revenir au DISPONIBLE TOTAL
     expect(find.text('DISPONIBLE TOTAL'), findsOneWidget);
+
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump(const Duration(seconds: 12));
   });
 }

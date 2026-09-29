@@ -276,6 +276,7 @@ class DbHelper {
         id_type_mouvement INTEGER NOT NULL REFERENCES type_mouvement_caisse(id) ON DELETE RESTRICT,
         id_mode_paiement INTEGER NOT NULL REFERENCES mode_paiement(id) ON DELETE RESTRICT,
         id_utilisateur INTEGER REFERENCES utilisateur(id) ON DELETE SET NULL,
+        id_journal_caisse INTEGER REFERENCES journal_caisse(id) ON DELETE SET NULL,
         montant REAL NOT NULL CHECK (montant > 0),
         solde_avant REAL NOT NULL,
         solde_apres REAL NOT NULL,
@@ -300,6 +301,45 @@ class DbHelper {
         motif TEXT,
         created_at TEXT DEFAULT (DATETIME('now', 'localtime')),
         CONSTRAINT chk_transfert_caisses_distinctes CHECK (id_caisse_source <> id_caisse_destination)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE journal_caisse (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_journal TEXT NOT NULL UNIQUE,
+        date_journal TEXT NOT NULL,
+        date_ouverture TEXT NOT NULL DEFAULT (DATETIME('now', 'localtime')),
+        date_fermeture TEXT,
+        id_utilisateur_ouverture INTEGER NOT NULL REFERENCES utilisateur(id) ON DELETE RESTRICT,
+        id_utilisateur_fermeture INTEGER REFERENCES utilisateur(id) ON DELETE RESTRICT,
+        solde_ouverture_total REAL NOT NULL DEFAULT 0.00,
+        total_entrees REAL DEFAULT 0.00,
+        total_sorties REAL DEFAULT 0.00,
+        solde_theorique_total REAL DEFAULT 0.00,
+        solde_reel_total REAL DEFAULT 0.00,
+        ecart_total REAL DEFAULT 0.00,
+        statut TEXT NOT NULL DEFAULT 'OUVERT' CHECK (statut IN ('OUVERT', 'CLOTURE')),
+        notes_ouverture TEXT,
+        notes_fermeture TEXT,
+        created_at TEXT DEFAULT (DATETIME('now', 'localtime')),
+        updated_at TEXT DEFAULT (DATETIME('now', 'localtime'))
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE journal_caisse_ligne (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_journal_caisse INTEGER NOT NULL REFERENCES journal_caisse(id) ON DELETE CASCADE,
+        id_caisse INTEGER NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
+        solde_ouverture REAL NOT NULL DEFAULT 0.00,
+        total_entrees REAL DEFAULT 0.00,
+        total_sorties REAL DEFAULT 0.00,
+        solde_theorique REAL DEFAULT 0.00,
+        solde_reel REAL,
+        ecart REAL DEFAULT 0.00,
+        notes TEXT,
+        CONSTRAINT uq_journal_caisse_ligne UNIQUE (id_journal_caisse, id_caisse)
       )
     ''');
 
@@ -599,6 +639,53 @@ class DbHelper {
         created_at TEXT DEFAULT (DATETIME('now', 'localtime'))
       )
     ''');
+
+    // Tables pour le journal de caisse
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS journal_caisse (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_journal TEXT NOT NULL UNIQUE,
+        date_journal TEXT NOT NULL,
+        date_ouverture TEXT NOT NULL DEFAULT (DATETIME('now', 'localtime')),
+        date_fermeture TEXT,
+        id_utilisateur_ouverture INTEGER NOT NULL REFERENCES utilisateur(id) ON DELETE RESTRICT,
+        id_utilisateur_fermeture INTEGER REFERENCES utilisateur(id) ON DELETE RESTRICT,
+        solde_ouverture_total REAL NOT NULL DEFAULT 0.00,
+        total_entrees REAL DEFAULT 0.00,
+        total_sorties REAL DEFAULT 0.00,
+        solde_theorique_total REAL DEFAULT 0.00,
+        solde_reel_total REAL DEFAULT 0.00,
+        ecart_total REAL DEFAULT 0.00,
+        statut TEXT NOT NULL DEFAULT 'OUVERT' CHECK (statut IN ('OUVERT', 'CLOTURE')),
+        notes_ouverture TEXT,
+        notes_fermeture TEXT,
+        created_at TEXT DEFAULT (DATETIME('now', 'localtime')),
+        updated_at TEXT DEFAULT (DATETIME('now', 'localtime'))
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS journal_caisse_ligne (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_journal_caisse INTEGER NOT NULL REFERENCES journal_caisse(id) ON DELETE CASCADE,
+        id_caisse INTEGER NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
+        solde_ouverture REAL NOT NULL DEFAULT 0.00,
+        total_entrees REAL DEFAULT 0.00,
+        total_sorties REAL DEFAULT 0.00,
+        solde_theorique REAL DEFAULT 0.00,
+        solde_reel REAL,
+        ecart REAL DEFAULT 0.00,
+        notes TEXT,
+        CONSTRAINT uq_journal_caisse_ligne UNIQUE (id_journal_caisse, id_caisse)
+      )
+    ''');
+
+    // Vérifier si la colonne id_journal_caisse existe dans mouvement_caisse
+    final mvtColumns = await db.rawQuery("PRAGMA table_info(mouvement_caisse)");
+    final hasJournalCol = mvtColumns.any((c) => c['name'] == 'id_journal_caisse');
+    if (!hasJournalCol) {
+      await db.execute('ALTER TABLE mouvement_caisse ADD COLUMN id_journal_caisse INTEGER REFERENCES journal_caisse(id) ON DELETE SET NULL');
+    }
 
     // Assurer qu'il y a au moins un client par défaut (Client Comptoir)
     final countClientRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM client');

@@ -204,6 +204,8 @@ CREATE TABLE mouvement_caisse (
     id_caisse INT NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
     id_type_mouvement INT NOT NULL REFERENCES type_mouvement_caisse(id) ON DELETE RESTRICT,
     id_mode_paiement INT NOT NULL REFERENCES mode_paiement(id) ON DELETE RESTRICT,
+    id_utilisateur INT REFERENCES utilisateur(id) ON DELETE SET NULL, -- Traçabilité : qui a opéré
+    id_journal_caisse INT REFERENCES journal_caisse(id) ON DELETE SET NULL, -- Rattachement au journal de caisse
     montant NUMERIC(15, 2) NOT NULL CHECK (montant > 0),
     solde_avant NUMERIC(15, 2) NOT NULL,
     solde_apres NUMERIC(15, 2) NOT NULL,
@@ -222,10 +224,50 @@ CREATE TABLE transfert_caisse (
     montant NUMERIC(15, 2) NOT NULL CHECK (montant > 0),
     frais_transfert NUMERIC(15, 2) DEFAULT 0.00,   -- Frais opérateur (ex: retrait Mvola)
     id_statut INT NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
+    id_utilisateur INT REFERENCES utilisateur(id) ON DELETE SET NULL,
     date_transfert TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     motif TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_transfert_caisses_distinctes CHECK (id_caisse_source <> id_caisse_destination)
+);
+
+-- -----------------------------------------------------------------------------
+-- 3.1 JOURNAL DE CAISSE (Sessions journalières : Ouverture matin, Clôture soir)
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE journal_caisse (
+    id SERIAL PRIMARY KEY,
+    numero_journal VARCHAR(50) NOT NULL UNIQUE,     -- ex: 'JRN-20260929-001'
+    date_journal DATE NOT NULL,
+    date_ouverture TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_fermeture TIMESTAMP,
+    id_utilisateur_ouverture INT NOT NULL REFERENCES utilisateur(id) ON DELETE RESTRICT,
+    id_utilisateur_fermeture INT REFERENCES utilisateur(id) ON DELETE RESTRICT,
+    solde_ouverture_total NUMERIC(15, 2) NOT NULL DEFAULT 0.00,  -- Somme des soldes d'ouverture de toutes les caisses
+    total_entrees NUMERIC(15, 2) DEFAULT 0.00,                   -- Total encaissé dans la journée
+    total_sorties NUMERIC(15, 2) DEFAULT 0.00,                   -- Total décaissé dans la journée
+    solde_theorique_total NUMERIC(15, 2) DEFAULT 0.00,           -- Ouverture + Entrées - Sorties
+    solde_reel_total NUMERIC(15, 2) DEFAULT 0.00,                -- Montant physique compté le soir
+    ecart_total NUMERIC(15, 2) DEFAULT 0.00,                     -- Réel - Théorique
+    statut VARCHAR(20) NOT NULL DEFAULT 'OUVERT' CHECK (statut IN ('OUVERT', 'CLOTURE')),
+    notes_ouverture TEXT,
+    notes_fermeture TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE journal_caisse_ligne (
+    id SERIAL PRIMARY KEY,
+    id_journal_caisse INT NOT NULL REFERENCES journal_caisse(id) ON DELETE CASCADE,
+    id_caisse INT NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
+    solde_ouverture NUMERIC(15, 2) NOT NULL DEFAULT 0.00,    -- Solde de clôture de la veille (report) ou solde initial
+    total_entrees NUMERIC(15, 2) DEFAULT 0.00,               -- Total entrées de la journée sur ce compte
+    total_sorties NUMERIC(15, 2) DEFAULT 0.00,               -- Total sorties de la journée sur ce compte
+    solde_theorique NUMERIC(15, 2) DEFAULT 0.00,             -- solde_ouverture + total_entrees - total_sorties
+    solde_reel NUMERIC(15, 2),                               -- Montant compté / constaté le soir à la fermeture
+    ecart NUMERIC(15, 2) DEFAULT 0.00,                       -- solde_reel - solde_theorique
+    notes TEXT,
+    CONSTRAINT uq_journal_caisse_ligne UNIQUE (id_journal_caisse, id_caisse)
 );
 
 -- -----------------------------------------------------------------------------
@@ -490,9 +532,16 @@ CREATE INDEX idx_caisse_devise ON caisse(id_devise);
 CREATE INDEX idx_mvt_caisse_caisse ON mouvement_caisse(id_caisse);
 CREATE INDEX idx_mvt_caisse_type ON mouvement_caisse(id_type_mouvement);
 CREATE INDEX idx_mvt_caisse_mode ON mouvement_caisse(id_mode_paiement);
+CREATE INDEX idx_mvt_caisse_journal ON mouvement_caisse(id_journal_caisse);
 CREATE INDEX idx_transfert_caisse_src ON transfert_caisse(id_caisse_source);
 CREATE INDEX idx_transfert_caisse_dest ON transfert_caisse(id_caisse_destination);
 CREATE INDEX idx_transfert_caisse_statut ON transfert_caisse(id_statut);
+
+-- Journal de Caisse
+CREATE INDEX idx_journal_caisse_date ON journal_caisse(date_journal);
+CREATE INDEX idx_journal_caisse_statut ON journal_caisse(statut);
+CREATE INDEX idx_journal_caisse_ligne_journal ON journal_caisse_ligne(id_journal_caisse);
+CREATE INDEX idx_journal_caisse_ligne_caisse ON journal_caisse_ligne(id_caisse);
 
 -- Workflow Achat
 CREATE INDEX idx_cmd_achat_fournisseur ON commande_achat(id_fournisseur);
