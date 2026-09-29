@@ -125,6 +125,15 @@ class _CaisseScreenState extends State<CaisseScreen> {
   }
 
   void _ouvrirNouveauMouvement() {
+    if (_journalActif == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppTheme.danger,
+          content: Text("Opération impossible : Le journal de caisse est fermé. Veuillez d'abord ouvrir la caisse du jour."),
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => NouveauMouvementDialog(
@@ -137,6 +146,15 @@ class _CaisseScreenState extends State<CaisseScreen> {
   }
 
   void _ouvrirVirementInterne() {
+    if (_journalActif == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppTheme.danger,
+          content: Text("Opération impossible : Le journal de caisse est fermé. Veuillez d'abord ouvrir la caisse du jour."),
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => TransfertInterneDialog(

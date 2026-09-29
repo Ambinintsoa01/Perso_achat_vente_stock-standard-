@@ -17,7 +17,7 @@ void main() {
   setUp(() async {
     db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
     DbHelper.setDatabaseForTesting(db);
-    await DbHelper.instance.populateTestDb(db);
+    await DbHelper.instance.populateTestDb(db, openDefaultJournal: false);
 
     caisseService = CaisseService();
     authService = AuthService.instance;
@@ -39,6 +39,26 @@ void main() {
     expect(caisses, isNotEmpty);
     final caisseComptoir = caisses.firstWhere((c) => c.code == 'CSH-01');
     final caisseMvola = caisses.firstWhere((c) => c.code == 'MVOLA-01');
+
+    // Règle métier : Aucun mouvement ni transfert de caisse possible si aucun journal n'est ouvert
+    expect(
+      () => caisseService.enregistrerMouvement(
+        idCaisse: caisseComptoir.id,
+        idTypeMouvement: 1,
+        idModePaiement: 1,
+        montant: 50000.0,
+      ),
+      throwsA(isA<Exception>()),
+    );
+
+    expect(
+      () => caisseService.transfertInterne(
+        idCaisseSource: caisseComptoir.id,
+        idCaisseDestination: caisseMvola.id,
+        montant: 20000.0,
+      ),
+      throwsA(isA<Exception>()),
+    );
 
     // 2. OUVERTURE JOUR 1 (Matin)
     // Comptoir = 100 000 Ar, MVola = 500 000 Ar
@@ -125,6 +145,17 @@ void main() {
 
     // Plus aucun journal n'est ouvert actuellement
     expect(await caisseService.getJournalOuvert(), isNull);
+
+    // Règle métier : Dès la clôture du soir, les mouvements de caisse sont à nouveau interdits
+    expect(
+      () => caisseService.enregistrerMouvement(
+        idCaisse: caisseComptoir.id,
+        idTypeMouvement: 1,
+        idModePaiement: 1,
+        montant: 10000.0,
+      ),
+      throwsA(isA<Exception>()),
+    );
 
     // 6. RÈGLE CRUCIALE DEMANDÉE PAR L'UTILISATEUR :
     // "Le reste d'argent dans la caisse (comptoire ou mobile money) d'aujourd'hui sera le solde de demain et ainsi de suite"

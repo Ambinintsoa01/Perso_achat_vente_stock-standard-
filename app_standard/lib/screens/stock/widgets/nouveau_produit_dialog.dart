@@ -205,11 +205,16 @@ class _NouveauProduitDialogState extends State<NouveauProduitDialog> {
                           Expanded(
                             child: DropdownButtonFormField<int>(
                               initialValue: _selectedCategorieId,
+                              isExpanded: true,
                               decoration: const InputDecoration(labelText: 'Catégorie'),
                               items: _categoriesList.map((cat) {
                                 return DropdownMenuItem<int>(
                                   value: cat.id,
-                                  child: Text(cat.nom),
+                                  child: Text(
+                                    cat.nom,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
                                 );
                               }).toList(),
                               onChanged: (val) => setState(() => _selectedCategorieId = val),
@@ -233,11 +238,16 @@ class _NouveauProduitDialogState extends State<NouveauProduitDialog> {
                       // Unité de mesure
                       DropdownButtonFormField<int>(
                         initialValue: _selectedUniteId,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Unité de mesure'),
                         items: widget.unites.map((u) {
                           return DropdownMenuItem<int>(
                             value: u.id,
-                            child: Text('${u.nom} (${u.code})'),
+                            child: Text(
+                              '${u.nom} (${u.code})',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) => setState(() => _selectedUniteId = val),

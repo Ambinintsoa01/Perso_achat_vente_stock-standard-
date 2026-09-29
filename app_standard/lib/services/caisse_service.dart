@@ -112,6 +112,13 @@ class CaisseService {
     final db = await _dbHelper.database;
 
     await db.transaction((txn) async {
+      // 0. Contrôle obligatoire : Aucun mouvement de caisse si aucun journal n'est ouvert
+      final openJournalRows = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
+      if (openJournalRows.isEmpty) {
+        throw Exception("Opération impossible : Aucun journal de caisse n'est actuellement ouvert. Veuillez d'abord ouvrir la caisse du jour.");
+      }
+      final idJournal = openJournalRows.first['id'] as int;
+
       // 1. Lire la caisse
       final caisseRows = await txn.query('caisse', where: 'id = ?', whereArgs: [idCaisse]);
       if (caisseRows.isEmpty) throw Exception('Caisse introuvable');
@@ -137,11 +144,7 @@ class CaisseService {
         whereArgs: [idCaisse],
       );
 
-      // 4. Déterminer si un journal est ouvert pour y rattacher le mouvement
-      final openJournalRows = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
-      final idJournal = openJournalRows.isNotEmpty ? openJournalRows.first['id'] as int : null;
-
-      // 5. Insérer le mouvement
+      // 4. Insérer le mouvement rattaché au journal ouvert
       await txn.insert('mouvement_caisse', {
         'id_caisse': idCaisse,
         'id_type_mouvement': idTypeMouvement,
@@ -211,9 +214,12 @@ class CaisseService {
         'motif': motif,
       });
 
-      // Journal ouvert
+      // Contrôle obligatoire : Aucun mouvement de caisse si aucun journal n'est ouvert
       final openJournalRows = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
-      final idJournal = openJournalRows.isNotEmpty ? openJournalRows.first['id'] as int : null;
+      if (openJournalRows.isEmpty) {
+        throw Exception("Opération impossible : Aucun journal de caisse n'est actuellement ouvert. Veuillez d'abord ouvrir la caisse du jour.");
+      }
+      final idJournal = openJournalRows.first['id'] as int;
 
       // 5. Enregistrer les deux mouvements comptables correspondants
       // Débit source (Transfert Sortant = id 3)

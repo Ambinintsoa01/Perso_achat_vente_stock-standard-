@@ -207,6 +207,13 @@ class VenteService {
     final db = await _dbHelper.database;
 
     return await db.transaction((txn) async {
+      // 0. Contrôle obligatoire : Aucun mouvement ni vente si aucun journal de caisse n'est ouvert
+      final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
+      if (openJc.isEmpty) {
+        throw Exception("Vente impossible : Aucun journal de caisse n'est actuellement ouvert. Veuillez d'abord ouvrir la caisse du jour.");
+      }
+      final idJournal = openJc.first['id'] as int;
+
       // 1. Vérification de disponibilité des stocks pour chaque article
       double margeBruteTotale = 0.0;
       double totalHt = 0.0;
@@ -324,9 +331,6 @@ class VenteService {
 
         // Mise à jour du solde de caisse (Crédit)
         await txn.update('caisse', {'solde_actuel': soldeApres}, where: 'id = ?', whereArgs: [idCaisse]);
-
-        final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
-        final idJournal = openJc.isNotEmpty ? openJc.first['id'] as int : null;
 
         // Enregistrement MOUVEMENT DE CAISSE (ENCAISSEMENT_VENTE = id 1)
         await txn.insert('mouvement_caisse', {
@@ -457,8 +461,12 @@ class VenteService {
 
       final numFacture = facture['numero_facture'] as String;
 
+      // Contrôle obligatoire : Aucun mouvement de caisse si aucun journal n'est ouvert
       final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
-      final idJournal = openJc.isNotEmpty ? openJc.first['id'] as int : null;
+      if (openJc.isEmpty) {
+        throw Exception("Règlement impossible : Aucun journal de caisse n'est actuellement ouvert. Veuillez d'abord ouvrir la caisse du jour.");
+      }
+      final idJournal = openJc.first['id'] as int;
 
       // 4. Enregistrement MOUVEMENT DE CAISSE (ENCAISSEMENT_VENTE = id 1)
       await txn.insert('mouvement_caisse', {

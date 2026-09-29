@@ -29,9 +29,30 @@ class DbHelper {
   }
 
   @visibleForTesting
-  Future<void> populateTestDb(Database db) async {
+  Future<void> populateTestDb(Database db, {bool openDefaultJournal = true}) async {
     await _createDB(db, 1);
     await _ensureTablesExist(db);
+
+    if (openDefaultJournal) {
+      final date = DateTime.now().toIso8601String().substring(0, 10);
+      final idJ = await db.insert('journal_caisse', {
+        'numero_journal': 'JC-TEST-001',
+        'date_journal': date,
+        'date_ouverture': '$date 08:00:00',
+        'id_utilisateur_ouverture': 1,
+        'statut': 'OUVERT',
+        'solde_ouverture_total': 2080000.0,
+        'notes_ouverture': 'Journal de test automatique',
+      });
+      final caisses = await db.query('caisse');
+      for (var c in caisses) {
+        await db.insert('journal_caisse_ligne', {
+          'id_journal_caisse': idJ,
+          'id_caisse': c['id'],
+          'solde_ouverture': (c['solde_actuel'] as num).toDouble(),
+        });
+      }
+    }
   }
 
   Future<Database> _initDB(String filePath) async {

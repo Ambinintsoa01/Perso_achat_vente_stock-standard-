@@ -189,4 +189,39 @@ void main() {
     expect(cmdSoldee.estPaye, true);
     expect(cmdSoldee.resteAPayer, 0.0);
   });
+
+  test('Règle métier : Impossible d\'enregistrer un achat si le journal de caisse est fermé', () async {
+    // 1. Clôturer le journal ouvert
+    final j = await caisseService.getJournalOuvert();
+    if (j != null) {
+      await caisseService.fermerJournal(
+        idJournal: j.id,
+        idUtilisateurFermeture: 1,
+        soldesReelsParCaisse: {1: 250000.0},
+      );
+    }
+    expect(await caisseService.getJournalOuvert(), isNull);
+
+    final fournisseurs = await achatService.getFournisseurs();
+    final articles = await stockService.getArticles();
+
+    // 2. Tenter un achat au comptant
+    expect(
+      () => achatService.enregistrerAchat(
+        idFournisseur: fournisseurs.first.id,
+        articlesAchetes: [
+          LigneAchatInput(
+            idArticle: articles.first.id,
+            designation: articles.first.designation,
+            quantite: 1,
+            prixUnitaire: articles.first.prixAchatEstime,
+          ),
+        ],
+        payeImmediatement: true,
+        idCaisse: 1,
+      ),
+      throwsA(isA<Exception>()),
+      reason: 'Un achat ne doit pas pouvoir être effectué si aucun journal n\'est ouvert',
+    );
+  });
 }

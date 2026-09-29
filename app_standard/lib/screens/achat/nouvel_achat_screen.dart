@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import '../../models/article.dart';
 import '../../models/caisse.dart';
 import '../../models/fournisseur.dart';
+import '../../models/journal_caisse.dart';
 import '../../models/mode_paiement.dart';
 import '../../services/achat_service.dart';
 import '../../services/caisse_service.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
+import '../caisse/widgets/ouvrir_caisse_dialog.dart';
 import 'widgets/nouveau_fournisseur_dialog.dart';
 
 class NouvelAchatScreen extends StatefulWidget {
@@ -32,6 +34,7 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
   List<Article> _articles = [];
   List<Caisse> _caisses = [];
   List<ModePaiement> _modesPaiement = [];
+  JournalCaisse? _journalOuvert;
 
   int? _selectedFournisseurId;
   int? _selectedArticleId;
@@ -68,6 +71,7 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
       final articles = await _stockService.getArticles();
       final caisses = await _caisseService.getCaisses();
       final modes = await _caisseService.getModesPaiement();
+      final journal = await _caisseService.getJournalOuvert();
 
       if (mounted) {
         setState(() {
@@ -75,6 +79,7 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
           _articles = articles;
           _caisses = caisses;
           _modesPaiement = modes;
+          _journalOuvert = journal;
 
           if (fournisseurs.isNotEmpty) {
             _selectedFournisseurId = fournisseurs.first.id;
@@ -155,7 +160,29 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
     );
   }
 
+  void _ouvrirCaisseSession() {
+    showDialog(
+      context: context,
+      builder: (context) => OuvrirCaisseDialog(
+        caisses: _caisses,
+        onSuccess: () async {
+          final j = await _caisseService.getJournalOuvert();
+          if (mounted) setState(() => _journalOuvert = j);
+        },
+      ),
+    );
+  }
+
   Future<void> _validerAchat() async {
+    if (_journalOuvert == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppTheme.danger,
+          content: Text('Achat impossible : Aucun journal de caisse n\'est ouvert. Veuillez d\'abord ouvrir la session de caisse.'),
+        ),
+      );
+      return;
+    }
     if (_selectedFournisseurId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez choisir un fournisseur')),
@@ -231,6 +258,67 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_journalOuvert == null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.danger.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.lock_rounded, color: AppTheme.danger, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'JOURNAL DE CAISSE FERMÉ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.danger,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Aucun achat ne peut être enregistré sans session de caisse ouverte.',
+                                  style: TextStyle(fontSize: 11, color: Colors.black87),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: _ouvrirCaisseSession,
+                            icon: const Icon(Icons.wb_sunny_outlined, size: 14, color: Colors.white),
+                            label: const Text(
+                              'OUVRIR',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.danger,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // 1. SÉLECTION DU FOURNISSEUR
                   _buildSectionTitle('1. FOURNISSEUR / GROSSISTE'),
                   const SizedBox(height: 8),
@@ -246,11 +334,16 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                         Expanded(
                           child: DropdownButtonFormField<int>(
                             initialValue: _selectedFournisseurId,
+                            isExpanded: true,
                             decoration: const InputDecoration(labelText: 'Sélectionner le fournisseur *'),
                             items: _fournisseurs.map((f) {
                               return DropdownMenuItem<int>(
                                 value: f.id,
-                                child: Text(f.raisonSociale),
+                                child: Text(
+                                  f.raisonSociale,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               );
                             }).toList(),
                             onChanged: (val) => setState(() => _selectedFournisseurId = val),
@@ -293,6 +386,7 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                         else ...[
                           DropdownButtonFormField<int>(
                             initialValue: _selectedArticleId,
+                            isExpanded: true,
                             decoration: const InputDecoration(labelText: 'Article à acheter'),
                             items: _articles.map((art) {
                               return DropdownMenuItem<int>(
@@ -300,6 +394,7 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                                 child: Text(
                                   '${art.designation} (${art.reference})',
                                   overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               );
                             }).toList(),
@@ -387,6 +482,8 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                                         Text(
                                           item.designation,
                                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
                                           '${item.quantite.toStringAsFixed(0)} pcs x ${currencyFormatter.format(item.prixUnitaire)}',
@@ -418,9 +515,16 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text('TOTAL À PAYER', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                              Text(
-                                currencyFormatter.format(_totalPanier),
-                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: -0.5),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    currencyFormatter.format(_totalPanier),
+                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: -0.5),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -457,18 +561,21 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                                   onTap: () => setState(() => _payeImmediatement = true),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                                     decoration: BoxDecoration(
                                       color: _payeImmediatement ? Colors.black : Colors.transparent,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     alignment: Alignment.center,
-                                    child: Text(
-                                      'Comptant (Débit Caisse)',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: _payeImmediatement ? Colors.white : AppTheme.textSecondary,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        'Comptant (Débit Caisse)',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: _payeImmediatement ? Colors.white : AppTheme.textSecondary,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -479,18 +586,21 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                                   onTap: () => setState(() => _payeImmediatement = false),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                                     decoration: BoxDecoration(
                                       color: !_payeImmediatement ? AppTheme.danger : Colors.transparent,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     alignment: Alignment.center,
-                                    child: Text(
-                                      'À Crédit (Dette Fournisseur)',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: !_payeImmediatement ? Colors.white : AppTheme.textSecondary,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        'À Crédit (Dette Fournisseur)',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: !_payeImmediatement ? Colors.white : AppTheme.textSecondary,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -505,27 +615,41 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
                           // Choix Caisse
                           DropdownButtonFormField<int>(
                             initialValue: _selectedCaisseId,
+                            isExpanded: true,
                             decoration: const InputDecoration(labelText: 'Compte ou Tiroir-Caisse à débiter *'),
                             items: _caisses.map((c) {
                               return DropdownMenuItem<int>(
                                 value: c.id,
-                                child: Text('${c.nom} (${c.soldeActuel.toStringAsFixed(0)} Ar)'),
+                                child: Text(
+                                  '${c.nom} (${currencyFormatter.format(c.soldeActuel)})',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedCaisseId = val),
+                            onChanged: (val) {
+                              if (val != null) setState(() => _selectedCaisseId = val);
+                            },
                           ),
                           const SizedBox(height: 12),
                           // Choix Mode Paiement
                           DropdownButtonFormField<int>(
                             initialValue: _selectedModePaiementId,
+                            isExpanded: true,
                             decoration: const InputDecoration(labelText: 'Moyen de paiement'),
                             items: _modesPaiement.map((mp) {
                               return DropdownMenuItem<int>(
                                 value: mp.id,
-                                child: Text(mp.libelle),
+                                child: Text(
+                                  mp.libelle,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedModePaiementId = val),
+                            onChanged: (val) {
+                              if (val != null) setState(() => _selectedModePaiementId = val);
+                            },
                           ),
                         ] else ...[
                           Container(
@@ -567,9 +691,12 @@ class _NouvelAchatScreenState extends State<NouvelAchatScreen> {
             icon: const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
             label: _isSubmitting
                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Text(
-                    'VALIDER L\'ACHAT • ${currencyFormatter.format(_totalPanier)}',
-                    style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'VALIDER L\'ACHAT • ${currencyFormatter.format(_totalPanier)}',
+                      style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                    ),
                   ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,

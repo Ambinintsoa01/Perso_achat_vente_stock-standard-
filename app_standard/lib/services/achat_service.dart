@@ -156,6 +156,13 @@ class AchatService {
     final db = await _dbHelper.database;
 
     return await db.transaction((txn) async {
+      // 0. Contrôle obligatoire : Aucun mouvement ni achat si aucun journal de caisse n'est ouvert
+      final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
+      if (openJc.isEmpty) {
+        throw Exception("Achat impossible : Aucun journal de caisse n'est actuellement ouvert. Veuillez d'abord ouvrir la caisse du jour.");
+      }
+      final idJournal = openJc.first['id'] as int;
+
       // 1. Calcul du montant total
       double totalHt = 0.0;
       for (var item in articlesAchetes) {
@@ -292,9 +299,6 @@ class AchatService {
         // Mise à jour de la caisse
         await txn.update('caisse', {'solde_actuel': soldeApres}, where: 'id = ?', whereArgs: [idCaisse]);
 
-        final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
-        final idJournal = openJc.isNotEmpty ? openJc.first['id'] as int : null;
-
         // Enregistrement MOUVEMENT DE CAISSE (DECAISSEMENT_ACHAT = id 2)
         await txn.insert('mouvement_caisse', {
           'id_caisse': idCaisse,
@@ -395,8 +399,12 @@ class AchatService {
       final soldeApres = soldeAvant - montant;
       await txn.update('caisse', {'solde_actuel': soldeApres}, where: 'id = ?', whereArgs: [idCaisse]);
 
+      // Contrôle obligatoire : Aucun mouvement de caisse si aucun journal n'est ouvert
       final openJc = await txn.query('journal_caisse', columns: ['id'], where: "statut = 'OUVERT'", limit: 1);
-      final idJournal = openJc.isNotEmpty ? openJc.first['id'] as int : null;
+      if (openJc.isEmpty) {
+        throw Exception("Décaissement impossible : Aucun journal de caisse n'est actuellement ouvert. Veuillez d'abord ouvrir la caisse du jour.");
+      }
+      final idJournal = openJc.first['id'] as int;
 
       // 3. Mouvement de caisse
       await txn.insert('mouvement_caisse', {

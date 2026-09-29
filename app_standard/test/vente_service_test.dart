@@ -247,4 +247,39 @@ void main() {
     expect(summary.totalVentesMois, isNonNegative);
     expect(summary.nombreVentes, isNonNegative);
   });
+
+  test('Règle métier : Impossible d\'enregistrer une vente si le journal de caisse est fermé', () async {
+    // 1. Clôturer le journal ouvert
+    final j = await caisseService.getJournalOuvert();
+    if (j != null) {
+      await caisseService.fermerJournal(
+        idJournal: j.id,
+        idUtilisateurFermeture: 1,
+        soldesReelsParCaisse: {1: 250000.0},
+      );
+    }
+    expect(await caisseService.getJournalOuvert(), isNull);
+
+    final clients = await venteService.getClients();
+    final articles = await stockService.getArticles();
+
+    // 2. Tenter une vente au comptant
+    expect(
+      () => venteService.enregistrerVente(
+        idClient: clients.first.id,
+        articlesVendus: [
+          LigneVenteInput(
+            idArticle: articles.first.id,
+            designation: articles.first.designation,
+            quantite: 1,
+            prixUnitaire: articles.first.prixVenteStandard,
+          ),
+        ],
+        payeImmediatement: true,
+        idCaisse: 1,
+      ),
+      throwsA(isA<Exception>()),
+      reason: 'Une vente ne doit pas pouvoir être effectuée si aucun journal n\'est ouvert',
+    );
+  });
 }

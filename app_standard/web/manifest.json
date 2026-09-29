@@ -1,6 +1,6 @@
 {
-    "name": "app_standard",
-    "short_name": "app_standard",
+    "name": "E-shop",
+    "short_name": "E-shop",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

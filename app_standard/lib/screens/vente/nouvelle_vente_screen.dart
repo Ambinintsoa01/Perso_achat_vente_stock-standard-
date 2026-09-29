@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import '../../models/article.dart';
 import '../../models/caisse.dart';
 import '../../models/client.dart';
+import '../../models/journal_caisse.dart';
 import '../../models/mode_paiement.dart';
 import '../../services/caisse_service.dart';
 import '../../services/stock_service.dart';
 import '../../services/vente_service.dart';
 import '../../theme/app_theme.dart';
+import '../caisse/widgets/ouvrir_caisse_dialog.dart';
 import 'widgets/nouveau_client_dialog.dart';
 
 class NouvelleVenteScreen extends StatefulWidget {
@@ -32,6 +34,7 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
   List<Article> _articles = [];
   List<Caisse> _caisses = [];
   List<ModePaiement> _modesPaiement = [];
+  JournalCaisse? _journalOuvert;
 
   int? _selectedClientId;
   int? _selectedArticleId;
@@ -70,6 +73,7 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
       final articles = await _stockService.getArticles();
       final caisses = await _caisseService.getCaisses();
       final modes = await _caisseService.getModesPaiement();
+      final journal = await _caisseService.getJournalOuvert();
 
       if (mounted) {
         setState(() {
@@ -77,6 +81,7 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
           _articles = articles;
           _caisses = caisses;
           _modesPaiement = modes;
+          _journalOuvert = journal;
 
           if (clients.isNotEmpty) {
             _selectedClientId = clients.first.id;
@@ -179,7 +184,29 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
     );
   }
 
+  void _ouvrirCaisseSession() {
+    showDialog(
+      context: context,
+      builder: (context) => OuvrirCaisseDialog(
+        caisses: _caisses,
+        onSuccess: () async {
+          final j = await _caisseService.getJournalOuvert();
+          if (mounted) setState(() => _journalOuvert = j);
+        },
+      ),
+    );
+  }
+
   Future<void> _validerVente() async {
+    if (_journalOuvert == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppTheme.danger,
+          content: Text('Vente impossible : Aucun journal de caisse n\'est ouvert. Veuillez d\'abord ouvrir la session de caisse.'),
+        ),
+      );
+      return;
+    }
     if (_panier.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Le panier est vide. Veuillez ajouter au moins un produit.')),
@@ -265,6 +292,67 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_journalOuvert == null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.danger.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.lock_rounded, color: AppTheme.danger, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'JOURNAL DE CAISSE FERMÉ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.danger,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Aucune vente ne peut être enregistrée sans session de caisse ouverte.',
+                                  style: TextStyle(fontSize: 11, color: Colors.black87),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: _ouvrirCaisseSession,
+                            icon: const Icon(Icons.wb_sunny_outlined, size: 14, color: Colors.white),
+                            label: const Text(
+                              'OUVRIR',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.danger,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // 1. CLIENT SECTION
                   _buildSectionHeader('1. CLIENT & FACTURATION'),
                   const SizedBox(height: 10),

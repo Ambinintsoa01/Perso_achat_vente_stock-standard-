@@ -27,7 +27,7 @@ class AchatVenteStockApp extends StatelessWidget {
         final isAuth = AuthService.instance.isAuthenticated || startAuthenticated;
 
         return MaterialApp(
-          title: 'Gestion Commerciale & Stock',
+          title: 'E-shop',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           home: isAuth ? const MainShell() : const LoginScreen(),
