@@ -271,7 +271,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
-                      height: 145,
+                      height: 160,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: _caisses.length,
@@ -302,17 +302,22 @@ class _CaisseScreenState extends State<CaisseScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _selectedCaisseFilter != null
-                              ? 'OPÉRATIONS : ${_caisses.firstWhere((c) => c.id == _selectedCaisseFilter).nom.toUpperCase()}'
-                              : 'DERNIÈRES OPÉRATIONS',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.6,
-                            color: AppTheme.textPrimary,
+                        Expanded(
+                          child: Text(
+                            _selectedCaisseFilter != null
+                                ? 'OPÉRATIONS : ${_caisses.firstWhere((c) => c.id == _selectedCaisseFilter).nom.toUpperCase()}'
+                                : 'DERNIÈRES OPÉRATIONS',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           '${_mouvements.length} lignes',
                           style: const TextStyle(
@@ -415,33 +420,43 @@ class _CaisseScreenState extends State<CaisseScreen> {
   }
 
   Widget _buildSummaryMiniBadge(String title, double amount, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 12, color: Colors.white70),
-            const SizedBox(width: 4),
-            Text(
-              title,
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12, color: Colors.white70),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              currencyFormatter.format(amount),
               style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 3),
-        Text(
-          currencyFormatter.format(amount),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

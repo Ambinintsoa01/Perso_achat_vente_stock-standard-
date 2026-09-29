@@ -54,7 +54,7 @@ class CaisseCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: 220,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isSelected ? Colors.black : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -80,7 +80,7 @@ class CaisseCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: isSelected ? Colors.white.withValues(alpha: 0.15) : accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
@@ -108,9 +108,10 @@ class CaisseCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   caisse.nom,
@@ -122,7 +123,8 @@ class CaisseCard extends StatelessWidget {
                     color: isSelected ? Colors.white : AppTheme.textPrimary,
                   ),
                 ),
-                if (caisse.numeroCompte != null && caisse.numeroCompte!.isNotEmpty)
+                if (caisse.numeroCompte != null && caisse.numeroCompte!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
                   Text(
                     caisse.numeroCompte!,
                     maxLines: 1,
@@ -132,16 +134,21 @@ class CaisseCard extends StatelessWidget {
                       color: isSelected ? Colors.white70 : AppTheme.textSecondary,
                     ),
                   ),
+                ],
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              currencyFormatter.format(caisse.soldeActuel),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: isSelected ? Colors.white : AppTheme.textPrimary,
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                currencyFormatter.format(caisse.soldeActuel),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: isSelected ? Colors.white : AppTheme.textPrimary,
+                ),
               ),
             ),
           ],

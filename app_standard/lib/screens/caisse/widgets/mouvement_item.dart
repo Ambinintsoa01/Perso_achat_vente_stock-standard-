@@ -22,7 +22,7 @@ class MouvementItem extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -33,7 +33,7 @@ class MouvementItem extends StatelessWidget {
         children: [
           // Icône circulaire de sens
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
               color: badgeBg,
               shape: BoxShape.circle,
@@ -41,10 +41,10 @@ class MouvementItem extends StatelessWidget {
             child: Icon(
               isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
               color: badgeColor,
-              size: 20,
+              size: 18,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           // Description & Infos
           Expanded(
             child: Column(
@@ -68,16 +68,21 @@ class MouvementItem extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    if (mouvement.referencePiece != null)
-                      Text(
-                        mouvement.referencePiece!,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: AppTheme.textSecondary,
+                    if (mouvement.referencePiece != null && mouvement.referencePiece!.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          mouvement.referencePiece!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textSecondary,
+                          ),
                         ),
                       ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -85,48 +90,79 @@ class MouvementItem extends StatelessWidget {
                   mouvement.description?.isNotEmpty == true
                       ? mouvement.description!
                       : (isCredit ? 'Entrée de fonds' : 'Sortie de fonds'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(Icons.account_balance_wallet_outlined, size: 13, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Text(
-                      mouvement.caisseNom ?? '',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(width: 10),
-                    Icon(Icons.payment_rounded, size: 13, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Text(
-                      mouvement.modePaiementLibelle ?? '',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
+                    if (mouvement.caisseNom != null && mouvement.caisseNom!.isNotEmpty)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.account_balance_wallet_outlined, size: 12, color: Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 130),
+                            child: Text(
+                              mouvement.caisseNom!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (mouvement.modePaiementLibelle != null && mouvement.modePaiementLibelle!.isNotEmpty)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.payment_rounded, size: 12, color: Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 110),
+                            child: Text(
+                              mouvement.modePaiementLibelle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           // Montant & Date
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                '${isCredit ? "+" : "-"} ${currencyFormatter.format(mouvement.montant)}',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: badgeColor,
-                  letterSpacing: -0.3,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${isCredit ? "+" : "-"} ${currencyFormatter.format(mouvement.montant)}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: badgeColor,
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 mouvement.dateMouvement.length >= 16
                     ? mouvement.dateMouvement.substring(5, 16)
@@ -137,12 +173,16 @@ class MouvementItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                'Solde: ${currencyFormatter.format(mouvement.soldeApres)}',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade500,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Solde: ${currencyFormatter.format(mouvement.soldeApres)}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade500,
+                  ),
                 ),
               ),
             ],
