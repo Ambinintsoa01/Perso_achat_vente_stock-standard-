@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import '../database/db_helper.dart';
 import '../models/article.dart';
 import '../models/categorie.dart';
@@ -281,9 +282,12 @@ class StockService {
     int? idTypeMouvement,
     int? sens,
     String? searchQuery,
+    DateTime? dateDebut,
+    DateTime? dateFin,
     int limit = 150,
   }) async {
     final db = await _dbHelper.database;
+    final DateFormat formatter = DateFormat('yyyy-MM-dd');
     String whereClause = 'WHERE 1=1';
     List<dynamic> args = [];
 
@@ -300,6 +304,16 @@ class StockService {
     if (sens != null) {
       whereClause += ' AND tms.sens = ?';
       args.add(sens);
+    }
+
+    if (dateDebut != null) {
+      whereClause += ' AND DATE(ms.date_mouvement) >= ?';
+      args.add(formatter.format(dateDebut));
+    }
+
+    if (dateFin != null) {
+      whereClause += ' AND DATE(ms.date_mouvement) <= ?';
+      args.add(formatter.format(dateFin));
     }
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {

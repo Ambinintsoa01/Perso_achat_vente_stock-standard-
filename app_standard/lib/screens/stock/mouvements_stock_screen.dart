@@ -3,6 +3,7 @@ import '../../models/article.dart';
 import '../../models/mouvement_stock.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/date_filter_bar.dart';
 import 'widgets/ajustement_stock_dialog.dart';
 import 'widgets/mouvement_stock_item.dart';
 
@@ -31,6 +32,8 @@ class _MouvementsStockScreenState extends State<MouvementsStockScreen> {
   Article? _selectedArticle;
   int? _selectedSens; // null = Tous, 1 = Entrée, -1 = Sortie
   int? _selectedTypeMouvement; // null = Tous
+  DateTime? _dateDebut;
+  DateTime? _dateFin;
   bool _isLoading = true;
 
   @override
@@ -57,6 +60,8 @@ class _MouvementsStockScreenState extends State<MouvementsStockScreen> {
         idTypeMouvement: _selectedTypeMouvement,
         sens: _selectedSens,
         searchQuery: _searchController.text,
+        dateDebut: _dateDebut,
+        dateFin: _dateFin,
       );
 
       if (mounted) {
@@ -337,6 +342,20 @@ class _MouvementsStockScreenState extends State<MouvementsStockScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // FILTRE PAR DATE
+                    DateFilterBar(
+                      initialStartDate: _dateDebut,
+                      initialEndDate: _dateFin,
+                      onDateRangeChanged: (start, end) {
+                        setState(() {
+                          _dateDebut = start;
+                          _dateFin = end;
+                        });
+                        _loadData();
+                      },
                     ),
                     const SizedBox(height: 12),
 

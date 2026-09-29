@@ -6,6 +6,7 @@ import '../../models/mode_paiement.dart';
 import '../../services/achat_service.dart';
 import '../../services/caisse_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/date_filter_bar.dart';
 import 'nouvel_achat_screen.dart';
 import 'widgets/commande_achat_card.dart';
 import 'widgets/nouveau_fournisseur_dialog.dart';
@@ -34,6 +35,8 @@ class _AchatScreenState extends State<AchatScreen> {
   AchatSummary? _summary;
 
   bool _onlyUnpaid = false;
+  DateTime? _dateDebut;
+  DateTime? _dateFin;
   bool _isLoading = true;
 
   @override
@@ -46,7 +49,11 @@ class _AchatScreenState extends State<AchatScreen> {
     setState(() => _isLoading = true);
     try {
       final summary = await _achatService.getAchatSummary();
-      final commandes = await _achatService.getCommandesAchat(onlyUnpaid: _onlyUnpaid);
+      final commandes = await _achatService.getCommandesAchat(
+        onlyUnpaid: _onlyUnpaid,
+        dateDebut: _dateDebut,
+        dateFin: _dateFin,
+      );
       final caisses = await _caisseService.getCaisses();
       final modes = await _caisseService.getModesPaiement();
 
@@ -281,7 +288,21 @@ class _AchatScreenState extends State<AchatScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
+
+                    // FILTRE PAR DATE
+                    DateFilterBar(
+                      initialStartDate: _dateDebut,
+                      initialEndDate: _dateFin,
+                      onDateRangeChanged: (start, end) {
+                        setState(() {
+                          _dateDebut = start;
+                          _dateFin = end;
+                        });
+                        _loadData();
+                      },
+                    ),
+                    const SizedBox(height: 16),
 
                     // LISTE DES COMMANDES D'ACHAT
                     if (_commandes.isEmpty)

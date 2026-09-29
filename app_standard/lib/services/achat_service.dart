@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import '../database/db_helper.dart';
 import '../models/commande_achat.dart';
 import '../models/fournisseur.dart';
@@ -65,9 +66,30 @@ class AchatService {
     });
   }
 
-  // Liste des commandes d'achat avec informations jointes
-  Future<List<CommandeAchat>> getCommandesAchat({bool? onlyUnpaid}) async {
+  // Liste des commandes d'achat avec informations jointes et filtre de date
+  Future<List<CommandeAchat>> getCommandesAchat({
+    bool? onlyUnpaid,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
     final db = await _dbHelper.database;
+    final DateFormat formatter = DateFormat('yyyy-MM-dd');
+
+    String whereClause = '';
+    List<dynamic> args = [];
+
+    if (dateDebut != null) {
+      whereClause += ' WHERE DATE(ca.date_commande) >= ?';
+      args.add(formatter.format(dateDebut));
+    }
+    if (dateFin != null) {
+      if (whereClause.isEmpty) {
+        whereClause += ' WHERE DATE(ca.date_commande) <= ?';
+      } else {
+        whereClause += ' AND DATE(ca.date_commande) <= ?';
+      }
+      args.add(formatter.format(dateFin));
+    }
 
     final query = '''
       SELECT 
@@ -83,11 +105,12 @@ class AchatService {
       JOIN statut s ON ca.id_statut = s.id
       LEFT JOIN commande_achat_ligne cal ON ca.id = cal.id_commande_achat
       LEFT JOIN facture_fournisseur ff ON ca.id = ff.id_commande_achat
+      $whereClause
       GROUP BY ca.id
       ORDER BY ca.id DESC
     ''';
 
-    final List<Map<String, dynamic>> maps = await db.rawQuery(query);
+    final List<Map<String, dynamic>> maps = await db.rawQuery(query, args);
     final list = maps.map((m) => CommandeAchat.fromMap(m)).toList();
 
     if (onlyUnpaid == true) {

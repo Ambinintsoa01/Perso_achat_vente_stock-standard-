@@ -5,6 +5,7 @@ import '../../models/mode_paiement.dart';
 import '../../models/mouvement_caisse.dart';
 import '../../services/caisse_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/date_filter_bar.dart';
 import 'widgets/caisse_card.dart';
 import 'widgets/mouvement_item.dart';
 import 'widgets/nouveau_mouvement_dialog.dart';
@@ -30,6 +31,8 @@ class _CaisseScreenState extends State<CaisseScreen> {
   List<ModePaiement> _modesPaiement = [];
   double _totalTresorerie = 0.0;
   int? _selectedCaisseFilter;
+  DateTime? _dateDebut;
+  DateTime? _dateFin;
   bool _isLoading = true;
 
   @override
@@ -43,7 +46,11 @@ class _CaisseScreenState extends State<CaisseScreen> {
     try {
       final caisses = await _caisseService.getCaisses();
       final total = await _caisseService.getTotalTresorerie();
-      final mouvements = await _caisseService.getMouvements(idCaisse: _selectedCaisseFilter);
+      final mouvements = await _caisseService.getMouvements(
+        idCaisse: _selectedCaisseFilter,
+        dateDebut: _dateDebut,
+        dateFin: _dateFin,
+      );
       final modes = await _caisseService.getModesPaiement();
 
       if (mounted) {
@@ -423,7 +430,21 @@ class _CaisseScreenState extends State<CaisseScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
+
+                    // FILTRE PAR DATE
+                    DateFilterBar(
+                      initialStartDate: _dateDebut,
+                      initialEndDate: _dateFin,
+                      onDateRangeChanged: (start, end) {
+                        setState(() {
+                          _dateDebut = start;
+                          _dateFin = end;
+                        });
+                        _loadData();
+                      },
+                    ),
+                    const SizedBox(height: 16),
 
                     // LISTE DES TRANSACTIONS
                     if (_mouvements.isEmpty)

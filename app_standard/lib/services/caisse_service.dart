@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import '../database/db_helper.dart';
 import '../models/caisse.dart';
 import '../models/mode_paiement.dart';
@@ -35,15 +36,32 @@ class CaisseService {
     return 0.0;
   }
 
-  // Liste des mouvements avec filtres et jointures
-  Future<List<MouvementCaisse>> getMouvements({int? idCaisse, int limit = 50}) async {
+  // Liste des mouvements avec filtres de caisse, dates et jointures
+  Future<List<MouvementCaisse>> getMouvements({
+    int? idCaisse,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+    int limit = 100,
+  }) async {
     final db = await _dbHelper.database;
-    String whereClause = '';
+    String whereClause = 'WHERE 1=1';
     List<dynamic> args = [];
 
     if (idCaisse != null && idCaisse > 0) {
-      whereClause = 'WHERE m.id_caisse = ?';
+      whereClause += ' AND m.id_caisse = ?';
       args.add(idCaisse);
+    }
+
+    if (dateDebut != null) {
+      final strDebut = DateFormat('yyyy-MM-dd').format(dateDebut);
+      whereClause += ' AND DATE(m.date_mouvement) >= ?';
+      args.add(strDebut);
+    }
+
+    if (dateFin != null) {
+      final strFin = DateFormat('yyyy-MM-dd').format(dateFin);
+      whereClause += ' AND DATE(m.date_mouvement) <= ?';
+      args.add(strFin);
     }
 
     final query = '''
