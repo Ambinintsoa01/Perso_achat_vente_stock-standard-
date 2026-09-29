@@ -20,12 +20,24 @@ class Profil {
   bool get isMagasinier => code.toUpperCase() == 'MAGASINIER';
   bool get isGerant => code.toUpperCase() == 'GERANT';
 
-  // Permissions de base selon le rôle
-  bool get canAccessStats => isAdmin || isGerant;
-  bool get canAccessAchat => isAdmin || isGerant || isMagasinier;
-  bool get canAccessStock => isAdmin || isGerant || isMagasinier || isCaissier;
+  // Accès aux modules principaux (access_controle.md)
   bool get canAccessVente => isAdmin || isGerant || isCaissier;
+  bool get canAccessStock => isAdmin || isGerant || isMagasinier;
+  bool get canAccessAchat => isAdmin || isGerant || isMagasinier;
   bool get canAccessCaisse => isAdmin || isGerant || isCaissier;
+  bool get canAccessStats => isAdmin || isGerant;
+
+  // Actions spécifiques au sein des modules (access_controle.md)
+  bool get canFaireTransfertCaisse => isAdmin || isGerant;
+  bool get canGererCatalogueProduits => isAdmin || isGerant;
+  bool get canReglerDettesFournisseurs => isAdmin || isGerant;
+  bool get canVoirTableauBordPatron => isAdmin || isGerant;
+  bool get canEffectuerCommande => isAdmin || isGerant || isCaissier;
+  bool get canGenererFacture => isAdmin || isGerant || isCaissier;
+  bool get canValiderLivraison => isAdmin || isGerant || isCaissier;
+  bool get canValiderPaiement => isAdmin || isGerant || isCaissier;
+  bool get canGererMouvementsStock => isAdmin || isGerant || isMagasinier;
+  bool get canGererInventaire => isAdmin || isGerant || isMagasinier;
 
   factory Profil.fromMap(Map<String, dynamic> map) {
     return Profil(

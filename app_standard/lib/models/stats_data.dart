@@ -77,3 +77,25 @@ class DepenseRepartitionItem {
     required this.pourcentage,
   });
 }
+
+class DashboardPatronSummary {
+  final double caisseJourTotal;
+  final double caisseJourEspeces;
+  final double caisseJourMobile;
+  final double beneficeJourMarge;
+  final double ventesJourTotal;
+  final double dettesClientsTotal;
+  final int nbClientsEnRetard;
+  final int alertesStockRupture;
+
+  const DashboardPatronSummary({
+    required this.caisseJourTotal,
+    required this.caisseJourEspeces,
+    required this.caisseJourMobile,
+    required this.beneficeJourMarge,
+    required this.ventesJourTotal,
+    required this.dettesClientsTotal,
+    required this.nbClientsEnRetard,
+    required this.alertesStockRupture,
+  });
+}

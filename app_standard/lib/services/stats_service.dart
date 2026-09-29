@@ -244,4 +244,68 @@ class StatsService {
       );
     }).toList();
   }
+
+  // 4. Tableau de bord du patron (access_controle.md : Résumé en 4 cartes)
+  Future<DashboardPatronSummary> getDashboardPatron() async {
+    final db = await _dbHelper.database;
+
+    // A. Caisse du jour (Total encaissé, Espèces, Mobile Money)
+    final resCaisse = await db.rawQuery('''
+      SELECT 
+        COALESCE(SUM(CASE WHEN tmc.sens = 1 THEN mc.montant ELSE 0 END), 0.0) as caisse_total,
+        COALESCE(SUM(CASE WHEN tmc.sens = 1 AND (c.code LIKE '%CSH%' OR c.id_type_caisse = 1) THEN mc.montant ELSE 0 END), 0.0) as caisse_cash,
+        COALESCE(SUM(CASE WHEN tmc.sens = 1 AND c.id_type_caisse = 3 THEN mc.montant ELSE 0 END), 0.0) as caisse_mobile
+      FROM mouvement_caisse mc
+      JOIN type_mouvement_caisse tmc ON mc.id_type_mouvement = tmc.id
+      JOIN caisse c ON mc.id_caisse = c.id
+      WHERE DATE(mc.date_mouvement) = DATE('now', 'localtime')
+    ''');
+    final caisseTotal = (resCaisse.first['caisse_total'] as num?)?.toDouble() ?? 0.0;
+    final caisseCash = (resCaisse.first['caisse_cash'] as num?)?.toDouble() ?? 0.0;
+    final caisseMobile = (resCaisse.first['caisse_mobile'] as num?)?.toDouble() ?? 0.0;
+
+    // B. Bénéfice du jour (Marge brute du jour)
+    final resMarge = await db.rawQuery('''
+      SELECT 
+        COALESCE(SUM(montant_ttc), 0.0) as total_ventes,
+        COALESCE(SUM(marge_brute), 0.0) as total_marge
+      FROM commande_vente
+      WHERE DATE(date_commande) = DATE('now', 'localtime')
+    ''');
+    final ventesJour = (resMarge.first['total_ventes'] as num?)?.toDouble() ?? 0.0;
+    final beneficeJour = (resMarge.first['total_marge'] as num?)?.toDouble() ?? 0.0;
+
+    // C. Dettes clients à récupérer (Carnet de dettes actives via factures impayées)
+    final resDettes = await db.rawQuery('''
+      SELECT 
+        COALESCE(SUM(montant_ttc - montant_paye), 0.0) as total_dettes,
+        COUNT(DISTINCT id_client) as nb_clients
+      FROM facture_client
+      WHERE montant_ttc > montant_paye
+    ''');
+    final totalDettes = (resDettes.first['total_dettes'] as num?)?.toDouble() ?? 0.0;
+    final nbClients = (resDettes.first['nb_clients'] as num?)?.toInt() ?? 0;
+
+    // D. Alertes Stock (Références critiques proches de 0 ou seuil alerte)
+    final resStock = await db.rawQuery('''
+      SELECT COUNT(DISTINCT a.id) as nb_alertes
+      FROM article a
+      LEFT JOIN stock_depot sd ON a.id = sd.id_article
+      WHERE a.actif = 1
+      GROUP BY a.id, a.seuil_alerte_stock
+      HAVING COALESCE(SUM(sd.quantite_reelle), 0) <= COALESCE(a.seuil_alerte_stock, 5.0)
+    ''');
+    final nbAlertes = resStock.length;
+
+    return DashboardPatronSummary(
+      caisseJourTotal: caisseTotal,
+      caisseJourEspeces: caisseCash,
+      caisseJourMobile: caisseMobile,
+      beneficeJourMarge: beneficeJour,
+      ventesJourTotal: ventesJour,
+      dettesClientsTotal: totalDettes,
+      nbClientsEnRetard: nbClients,
+      alertesStockRupture: nbAlertes,
+    );
+  }
 }

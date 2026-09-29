@@ -3,8 +3,10 @@ import 'package:intl/intl.dart';
 import '../../models/caisse.dart';
 import '../../models/mode_paiement.dart';
 import '../../models/mouvement_caisse.dart';
+import '../../services/auth_service.dart';
 import '../../services/caisse_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/access_denied_screen.dart';
 import '../../widgets/date_filter_bar.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'widgets/caisse_card.dart';
@@ -130,6 +132,15 @@ class _CaisseScreenState extends State<CaisseScreen> {
         ? 'SOLDE : ${selectedCaisse.nom.toUpperCase()}'
         : 'DISPONIBLE TOTAL';
 
+    final user = AuthService.instance.currentUser;
+    if (user != null && !user.profil.canAccessCaisse) {
+      return const AccessDeniedScreen(
+        moduleName: 'Caisse & Trésorerie',
+        profilsRequis: 'Caissier, Gérant, Administrateur',
+      );
+    }
+    final canTransfert = user == null || user.profil.canFaireTransfertCaisse;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -142,11 +153,12 @@ class _CaisseScreenState extends State<CaisseScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Virement interne',
-            icon: const Icon(Icons.swap_horiz_rounded, size: 24),
-            onPressed: _ouvrirVirementInterne,
-          ),
+          if (canTransfert)
+            IconButton(
+              tooltip: 'Virement interne',
+              icon: const Icon(Icons.swap_horiz_rounded, size: 24),
+              onPressed: _ouvrirVirementInterne,
+            ),
           IconButton(
             tooltip: 'Nouvelle opération',
             icon: const Icon(Icons.add_rounded, size: 24),
@@ -498,22 +510,24 @@ class _CaisseScreenState extends State<CaisseScreen> {
         child: SafeArea(
           child: Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _ouvrirVirementInterne,
-                  icon: const Icon(Icons.swap_horiz_rounded, size: 18, color: Colors.black),
-                  label: const Text(
-                    'VIREMENT INTERNE',
-                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, letterSpacing: 0.2),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Colors.black, width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              if (canTransfert) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _ouvrirVirementInterne,
+                    icon: const Icon(Icons.swap_horiz_rounded, size: 18, color: Colors.black),
+                    label: const Text(
+                      'VIREMENT INTERNE',
+                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: Colors.black, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _ouvrirNouveauMouvement,

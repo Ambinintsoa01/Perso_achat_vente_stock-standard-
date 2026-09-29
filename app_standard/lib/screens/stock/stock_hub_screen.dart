@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/article.dart';
+import '../../services/auth_service.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/access_denied_screen.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'categories_list_screen.dart';
 import 'mouvements_stock_screen.dart';
@@ -146,6 +148,15 @@ class _StockHubScreenState extends State<StockHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+    if (user != null && !user.profil.canAccessStock) {
+      return const AccessDeniedScreen(
+        moduleName: 'Gestion des Stocks',
+        profilsRequis: 'Magasinier, Gérant, Administrateur',
+      );
+    }
+    final canGererCatalogue = user == null || user.profil.canGererCatalogueProduits;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -163,11 +174,12 @@ class _StockHubScreenState extends State<StockHubScreen> {
             icon: const Icon(Icons.history_rounded, size: 24),
             onPressed: () => _ouvrirMouvementsStock(),
           ),
-          IconButton(
-            tooltip: 'Nouveau Produit',
-            icon: const Icon(Icons.add_rounded, size: 24),
-            onPressed: _ouvrirNouveauProduit,
-          ),
+          if (canGererCatalogue)
+            IconButton(
+              tooltip: 'Nouveau Produit',
+              icon: const Icon(Icons.add_rounded, size: 24),
+              onPressed: _ouvrirNouveauProduit,
+            ),
           const UserAvatarButton(),
         ],
       ),

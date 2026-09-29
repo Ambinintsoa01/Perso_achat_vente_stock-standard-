@@ -3,9 +3,11 @@ import 'package:intl/intl.dart';
 import '../../models/caisse.dart';
 import '../../models/commande_vente.dart';
 import '../../models/mode_paiement.dart';
+import '../../services/auth_service.dart';
 import '../../services/caisse_service.dart';
 import '../../services/vente_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/access_denied_screen.dart';
 import '../../widgets/date_filter_bar.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'nouvelle_vente_screen.dart';
@@ -216,6 +218,14 @@ class _VenteScreenState extends State<VenteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+    if (user != null && !user.profil.canAccessVente) {
+      return const AccessDeniedScreen(
+        moduleName: 'Ventes & Facturation',
+        profilsRequis: 'Caissier, Gérant, Administrateur',
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(

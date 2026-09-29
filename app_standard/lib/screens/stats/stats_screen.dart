@@ -3,12 +3,15 @@ import 'package:intl/intl.dart';
 import '../../models/article.dart';
 import '../../models/categorie.dart';
 import '../../models/stats_data.dart';
+import '../../services/auth_service.dart';
 import '../../services/stats_service.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/access_denied_screen.dart';
 import '../../widgets/date_filter_bar.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'widgets/depenses_visualisation_chart.dart';
+import 'widgets/patron_summary_cards.dart';
 import 'widgets/stats_kpi_card.dart';
 import 'widgets/vente_evolution_chart.dart';
 
@@ -39,6 +42,7 @@ class _StatsScreenState extends State<StatsScreen> {
 
   // Données chargées
   StatsKpiSummary? _kpiSummary;
+  DashboardPatronSummary? _patronSummary;
   List<VenteEvolutionPoint> _evolutionVentes = [];
   List<DepenseEvolutionPoint> _evolutionDepenses = [];
   List<DepenseRepartitionItem> _repartitionDepenses = [];
@@ -70,6 +74,8 @@ class _StatsScreenState extends State<StatsScreen> {
         dateFin: _dateFin,
       );
 
+      final patron = await _statsService.getDashboardPatron();
+
       final ventes = await _statsService.getEvolutionVentes(
         dateDebut: _dateDebut,
         dateFin: _dateFin,
@@ -93,6 +99,7 @@ class _StatsScreenState extends State<StatsScreen> {
       if (mounted) {
         setState(() {
           _kpiSummary = kpi;
+          _patronSummary = patron;
           _evolutionVentes = ventes;
           _evolutionDepenses = depenses;
           _repartitionDepenses = repartition;
@@ -132,6 +139,14 @@ class _StatsScreenState extends State<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+    if (user != null && !user.profil.canAccessStats) {
+      return const AccessDeniedScreen(
+        moduleName: 'Statistiques & Analyses',
+        profilsRequis: 'Administrateur, Gérant',
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -189,6 +204,15 @@ class _StatsScreenState extends State<StatsScreen> {
                           ],
                         ),
                       ),
+                    ],
+
+                    // 0. Tableau de bord patron (4 cartes clés) selon access_controle.md
+                    if (_patronSummary != null && (user == null || user.profil.canVoirTableauBordPatron)) ...[
+                      PatronSummaryCards(
+                        data: _patronSummary!,
+                        currencyFormatter: currencyFormatter,
+                      ),
+                      const SizedBox(height: 20),
                     ],
 
                     // 1. Barre de filtre de date obligatoire (AGENTS.md)

@@ -1,3 +1,5 @@
+import 'profil.dart';
+
 class Utilisateur {
   final int id;
   final int idProfil;
@@ -40,10 +42,34 @@ class Utilisateur {
     return '$p$n'.trim();
   }
 
-  bool get isAdmin => profilCode?.toUpperCase() == 'ADMIN';
-  bool get isCaissier => profilCode?.toUpperCase() == 'CAISSIER';
-  bool get isMagasinier => profilCode?.toUpperCase() == 'MAGASINIER';
-  bool get isGerant => profilCode?.toUpperCase() == 'GERANT';
+  Profil get profil => Profil(
+        id: idProfil,
+        numero: idProfil,
+        code: profilCode ?? 'ADMIN',
+        libelle: profilLibelle ?? (profilCode ?? 'Administrateur'),
+      );
+
+  bool get isAdmin => profil.isAdmin;
+  bool get isCaissier => profil.isCaissier;
+  bool get isMagasinier => profil.isMagasinier;
+  bool get isGerant => profil.isGerant;
+
+  // Délégués de permissions
+  bool get canAccessVente => profil.canAccessVente;
+  bool get canAccessStock => profil.canAccessStock;
+  bool get canAccessAchat => profil.canAccessAchat;
+  bool get canAccessCaisse => profil.canAccessCaisse;
+  bool get canAccessStats => profil.canAccessStats;
+  bool get canFaireTransfertCaisse => profil.canFaireTransfertCaisse;
+  bool get canGererCatalogueProduits => profil.canGererCatalogueProduits;
+  bool get canReglerDettesFournisseurs => profil.canReglerDettesFournisseurs;
+  bool get canVoirTableauBordPatron => profil.canVoirTableauBordPatron;
+  bool get canEffectuerCommande => profil.canEffectuerCommande;
+  bool get canGenererFacture => profil.canGenererFacture;
+  bool get canValiderLivraison => profil.canValiderLivraison;
+  bool get canValiderPaiement => profil.canValiderPaiement;
+  bool get canGererMouvementsStock => profil.canGererMouvementsStock;
+  bool get canGererInventaire => profil.canGererInventaire;
 
   factory Utilisateur.fromMap(Map<String, dynamic> map) {
     return Utilisateur(

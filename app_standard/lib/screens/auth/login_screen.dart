@@ -266,74 +266,74 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // // 3. Comptes & Profils SQL (Accès rapide pour tests)
-                  // Container(
-                  //   padding: const EdgeInsets.all(16),
-                  //   decoration: BoxDecoration(
-                  //     color: Colors.white,
-                  //     borderRadius: BorderRadius.circular(16),
-                  //     border: Border.all(color: Colors.grey.shade200),
-                  //   ),
-                  //   child: Column(
-                  //     crossAxisAlignment: CrossAxisAlignment.start,
-                  //     children: [
-                  //       const Row(
-                  //         children: [
-                  //           Icon(Icons.badge_outlined, size: 16, color: Colors.black87),
-                  //           SizedBox(width: 6),
-                  //           Text(
-                  //             'PROFILS SQL & ACCÈS RAPIDE',
-                  //             style: TextStyle(
-                  //               fontSize: 11,
-                  //               fontWeight: FontWeight.w800,
-                  //               letterSpacing: 0.5,
-                  //             ),
-                  //           ),
-                  //         ],
-                  //       ),
-                  //       const SizedBox(height: 10),
-                  //       Wrap(
-                  //         spacing: 8,
-                  //         runSpacing: 8,
-                  //         children: [
-                  //           _buildQuickLoginChip(
-                  //             label: 'Admin (Tout accès)',
-                  //             username: 'admin',
-                  //             password: 'admin123',
-                  //             role: 'ADMIN',
-                  //           ),
-                  //           _buildQuickLoginChip(
-                  //             label: 'Caissier',
-                  //             username: 'caissier',
-                  //             password: 'caissier123',
-                  //             role: 'CAISSIER',
-                  //           ),
-                  //           _buildQuickLoginChip(
-                  //             label: 'Magasinier',
-                  //             username: 'magasinier',
-                  //             password: 'magasinier123',
-                  //             role: 'MAGASINIER',
-                  //           ),
-                  //           _buildQuickLoginChip(
-                  //             label: 'Gérant',
-                  //             username: 'gerant',
-                  //             password: 'gerant123',
-                  //             role: 'GERANT',
-                  //           ),
-                  //         ],
-                  //       ),
-                  //       if (_profils.isNotEmpty) ...[
-                  //         const SizedBox(height: 12),
-                  //         const Divider(height: 1),
-                  //         const SizedBox(height: 10),
-                  //         Text(
-                  //           '${_profils.length} profils configurés dans la base de données',
-                  //           style: const TextStyle(fontSize: 10.5, color: AppTheme.textSecondary),
-                  //         ),
-                  //       ],
-                  //     ],
-                  //   ),
-                  // ),
+                  // 3. Comptes & Profils SQL (Accès rapide pour tests)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.badge_outlined, size: 16, color: Colors.black87),
+                            SizedBox(width: 6),
+                            Text(
+                              'PROFILS SQL & ACCÈS RAPIDE',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildQuickLoginChip(
+                              label: 'Admin (Tout accès)',
+                              username: 'admin',
+                              password: 'admin123',
+                              role: 'ADMIN',
+                            ),
+                            _buildQuickLoginChip(
+                              label: 'Caissier',
+                              username: 'caissier',
+                              password: 'caissier123',
+                              role: 'CAISSIER',
+                            ),
+                            _buildQuickLoginChip(
+                              label: 'Magasinier',
+                              username: 'magasinier',
+                              password: 'magasinier123',
+                              role: 'MAGASINIER',
+                            ),
+                            _buildQuickLoginChip(
+                              label: 'Gérant',
+                              username: 'gerant',
+                              password: 'gerant123',
+                              role: 'GERANT',
+                            ),
+                          ],
+                        ),
+                        if (_profils.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 10),
+                          Text(
+                            '${_profils.length} profils configurés dans la base de données',
+                            style: const TextStyle(fontSize: 10.5, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

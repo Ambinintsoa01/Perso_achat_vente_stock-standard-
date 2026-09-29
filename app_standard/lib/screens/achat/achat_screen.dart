@@ -4,8 +4,10 @@ import '../../models/caisse.dart';
 import '../../models/commande_achat.dart';
 import '../../models/mode_paiement.dart';
 import '../../services/achat_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/caisse_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/access_denied_screen.dart';
 import '../../widgets/date_filter_bar.dart';
 import '../../widgets/user_avatar_button.dart';
 import 'nouvel_achat_screen.dart';
@@ -107,6 +109,15 @@ class _AchatScreenState extends State<AchatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+    if (user != null && !user.profil.canAccessAchat) {
+      return const AccessDeniedScreen(
+        moduleName: 'Achats & Approvisionnement',
+        profilsRequis: 'Magasinier, Gérant, Administrateur',
+      );
+    }
+    final canReglerDettes = user == null || user.profil.canReglerDettesFournisseurs;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -341,7 +352,7 @@ class _AchatScreenState extends State<AchatScreen> {
                           final cmd = _commandes[index];
                           return CommandeAchatCard(
                             commande: cmd,
-                            onRegler: !cmd.estPaye ? () => _ouvrirReglementDette(cmd) : null,
+                            onRegler: (!cmd.estPaye && canReglerDettes) ? () => _ouvrirReglementDette(cmd) : null,
                           );
                         },
                       ),
