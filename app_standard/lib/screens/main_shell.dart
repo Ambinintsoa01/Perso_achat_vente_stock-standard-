@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
-import 'caisse/caisse_screen.dart';
-import 'stock/stock_hub_screen.dart';
 import 'achat/achat_screen.dart';
+import 'caisse/caisse_screen.dart';
+import 'stats/stats_screen.dart';
+import 'stock/stock_hub_screen.dart';
+import 'vente/vente_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -12,18 +13,15 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  // Par défaut, onglet Achats actif (index 2) ou Stocks (index 1)
-  int _currentIndex = 2; // Directement sur le module Achats !
+  // Onglet Ventes actif par défaut
+  int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const _PlaceholderScreen(
-      title: 'VENTES',
-      subtitle: 'Gestion des commandes clients, factures et livraisons',
-      icon: Icons.point_of_sale_rounded,
-    ),
+    const VenteScreen(),
     const StockHubScreen(),
     const AchatScreen(),
     const CaisseScreen(),
+    const StatsScreen(),
   ];
 
   @override
@@ -68,63 +66,10 @@ class _MainShellState extends State<MainShell> {
                 selectedIcon: Icon(Icons.account_balance_wallet_rounded, color: Colors.black),
                 label: 'Caisse',
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const _PlaceholderScreen({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      appBar: AppBar(
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: 0.5),
-        ),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.border),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Icon(icon, size: 48, color: Colors.black87),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              NavigationDestination(
+                icon: Icon(Icons.bar_chart_outlined),
+                selectedIcon: Icon(Icons.bar_chart_rounded, color: Colors.black),
+                label: 'Stats',
               ),
             ],
           ),
@@ -133,3 +78,4 @@ class _PlaceholderScreen extends StatelessWidget {
     );
   }
 }
+

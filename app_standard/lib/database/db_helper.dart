@@ -552,5 +552,62 @@ class DbHelper {
         ('FOURN-01', 'Grossiste Principal & Bazar', 'M. Razafy', '034 11 222 33', 'contact@grossiste.mg')
       ''');
     }
+
+    // Tables pour le module Ventes
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS commande_vente_ligne (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_commande_vente INTEGER NOT NULL REFERENCES commande_vente(id) ON DELETE CASCADE,
+        id_article INTEGER NOT NULL REFERENCES article(id) ON DELETE RESTRICT,
+        quantite REAL NOT NULL CHECK (quantite > 0),
+        prix_unitaire REAL NOT NULL CHECK (prix_unitaire >= 0),
+        taux_remise REAL DEFAULT 0.00,
+        montant_ht REAL NOT NULL,
+        montant_ttc REAL NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS facture_client (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_facture TEXT NOT NULL UNIQUE,
+        id_client INTEGER NOT NULL REFERENCES client(id) ON DELETE RESTRICT,
+        id_commande_vente INTEGER REFERENCES commande_vente(id) ON DELETE SET NULL,
+        id_statut INTEGER NOT NULL REFERENCES statut(id) ON DELETE RESTRICT,
+        date_facture TEXT DEFAULT (DATE('now', 'localtime')),
+        date_echeance TEXT,
+        montant_ht REAL DEFAULT 0.00,
+        montant_tva REAL DEFAULT 0.00,
+        montant_ttc REAL DEFAULT 0.00,
+        montant_paye REAL DEFAULT 0.00,
+        created_at TEXT DEFAULT (DATETIME('now', 'localtime'))
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS paiement_vente (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_paiement TEXT NOT NULL UNIQUE,
+        id_facture_client INTEGER NOT NULL REFERENCES facture_client(id) ON DELETE RESTRICT,
+        id_caisse INTEGER NOT NULL REFERENCES caisse(id) ON DELETE RESTRICT,
+        id_mode_paiement INTEGER NOT NULL REFERENCES mode_paiement(id) ON DELETE RESTRICT,
+        id_utilisateur INTEGER REFERENCES utilisateur(id) ON DELETE SET NULL,
+        date_paiement TEXT DEFAULT (DATE('now', 'localtime')),
+        montant REAL NOT NULL CHECK (montant > 0),
+        reference_transaction TEXT,
+        notes TEXT,
+        created_at TEXT DEFAULT (DATETIME('now', 'localtime'))
+      )
+    ''');
+
+    // Assurer qu'il y a au moins un client par défaut (Client Comptoir)
+    final countClientRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM client');
+    final countClient = (countClientRes.first['cnt'] as num?)?.toInt() ?? 0;
+    if (countClient == 0) {
+      await db.rawInsert('''
+        INSERT INTO client (code, nom_complet, id_type_client, telephone, email) VALUES
+        ('CLI-001', 'Client Comptoir (Passage)', 1, '034 00 000 00', 'client@passage.mg')
+      ''');
+    }
   }
 }
