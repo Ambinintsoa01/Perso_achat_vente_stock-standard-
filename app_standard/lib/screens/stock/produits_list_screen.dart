@@ -4,6 +4,7 @@ import '../../models/categorie.dart';
 import '../../models/unite_mesure.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
+import 'mouvements_stock_screen.dart';
 import 'widgets/ajustement_stock_dialog.dart';
 import 'widgets/article_card.dart';
 import 'widgets/nouveau_produit_dialog.dart';
@@ -313,6 +314,14 @@ class _ProduitsListScreenState extends State<ProduitsListScreen> {
                             return ArticleCard(
                               article: art,
                               onAdjustStock: () => _ouvrirAjustementStock(art),
+                              onViewMovements: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => MouvementsStockScreen(initialArticle: art),
+                                  ),
+                                ).then((_) => _loadData());
+                              },
                             );
                           },
                         ),

@@ -6,11 +6,13 @@ import '../../../theme/app_theme.dart';
 class ArticleCard extends StatelessWidget {
   final Article article;
   final VoidCallback? onAdjustStock;
+  final VoidCallback? onViewMovements;
 
   const ArticleCard({
     super.key,
     required this.article,
     this.onAdjustStock,
+    this.onViewMovements,
   });
 
   @override
@@ -42,20 +44,22 @@ class ArticleCard extends StatelessWidget {
     final statusColor = getStatusColor();
     final statusBg = getStatusBg();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: article.isRupture ? AppTheme.danger.withValues(alpha: 0.3) : AppTheme.border,
-          width: article.isRupture ? 1.5 : 1.0,
+    return GestureDetector(
+      onTap: onViewMovements,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: article.isRupture ? AppTheme.danger.withValues(alpha: 0.3) : AppTheme.border,
+            width: article.isRupture ? 1.5 : 1.0,
+          ),
         ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
           // Vignette visuelle du produit
           Container(
             width: 52,
@@ -194,6 +198,7 @@ class ArticleCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

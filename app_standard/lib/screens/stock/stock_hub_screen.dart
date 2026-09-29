@@ -4,6 +4,7 @@ import '../../models/article.dart';
 import '../../services/stock_service.dart';
 import '../../theme/app_theme.dart';
 import 'categories_list_screen.dart';
+import 'mouvements_stock_screen.dart';
 import 'produits_list_screen.dart';
 import 'widgets/ajustement_stock_dialog.dart';
 import 'widgets/nouveau_produit_dialog.dart';
@@ -100,6 +101,15 @@ class _StockHubScreenState extends State<StockHubScreen> {
     );
   }
 
+  void _ouvrirMouvementsStock({Article? article}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MouvementsStockScreen(initialArticle: article),
+      ),
+    ).then((_) => _loadSummary());
+  }
+
   void _ouvrirNouveauProduit() async {
     final categories = await _stockService.getCategories();
     final unites = await _stockService.getUnites();
@@ -147,6 +157,11 @@ class _StockHubScreenState extends State<StockHubScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Historique des Mouvements',
+            icon: const Icon(Icons.history_rounded, size: 24),
+            onPressed: () => _ouvrirMouvementsStock(),
+          ),
           IconButton(
             tooltip: 'Nouveau Produit',
             icon: const Icon(Icons.add_rounded, size: 24),
@@ -317,6 +332,16 @@ class _StockHubScreenState extends State<StockHubScreen> {
                       icon: Icons.indeterminate_check_box_outlined,
                       accentColor: AppTheme.danger,
                       onTap: _ouvrirRemoveStock,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Carte 5: MOUVEMENTS DE STOCK
+                    _buildHubCard(
+                      title: 'MOUVEMENTS DE STOCK',
+                      subtitle: 'Historique des flux, entrées, sorties et traçabilité',
+                      icon: Icons.swap_vert_rounded,
+                      accentColor: const Color(0xFF7C3AED),
+                      onTap: _ouvrirMouvementsStock,
                     ),
                     const SizedBox(height: 30),
                   ],

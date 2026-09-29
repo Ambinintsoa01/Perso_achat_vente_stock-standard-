@@ -1,6 +1,7 @@
 import '../database/db_helper.dart';
 import '../models/article.dart';
 import '../models/categorie.dart';
+import '../models/mouvement_stock.dart';
 import '../models/unite_mesure.dart';
 
 class StockSummary {
@@ -181,7 +182,7 @@ class StockService {
   // Ajustement manuel de stock (Entrée / Sortie / Inventaire)
   Future<void> ajusterStock({
     required int idArticle,
-    required int idDepot,
+    int idDepot = 1,
     required double quantite,
     required int idTypeMouvement, // 1: Entrée Achat, 2: Sortie Vente, 3: Positif, 4: Négatif
     int? idUtilisateur,
@@ -272,5 +273,70 @@ class StockService {
       articlesEnAlerte: alerteCount,
       articlesEnRupture: ruptureCount,
     );
+  }
+
+  // Récupérer l'historique des mouvements de stock avec filtres
+  Future<List<MouvementStock>> getMouvementsStock({
+    int? idArticle,
+    int? idTypeMouvement,
+    int? sens,
+    String? searchQuery,
+    int limit = 150,
+  }) async {
+    final db = await _dbHelper.database;
+    String whereClause = 'WHERE 1=1';
+    List<dynamic> args = [];
+
+    if (idArticle != null && idArticle > 0) {
+      whereClause += ' AND ms.id_article = ?';
+      args.add(idArticle);
+    }
+
+    if (idTypeMouvement != null && idTypeMouvement > 0) {
+      whereClause += ' AND ms.id_type_mouvement = ?';
+      args.add(idTypeMouvement);
+    }
+
+    if (sens != null) {
+      whereClause += ' AND tms.sens = ?';
+      args.add(sens);
+    }
+
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      whereClause += ' AND (a.designation LIKE ? OR a.reference LIKE ? OR ms.reference_document LIKE ? OR ms.remarque LIKE ?)';
+      final p = '%${searchQuery.trim()}%';
+      args.addAll([p, p, p, p]);
+    }
+
+    final query = '''
+      SELECT 
+        ms.*,
+        a.reference as article_reference,
+        a.designation as article_designation,
+        u.code as unite_code,
+        tms.code as type_code,
+        tms.libelle as type_libelle,
+        tms.sens as sens,
+        d.nom as depot_nom,
+        usr.nom_utilisateur as utilisateur_nom
+      FROM mouvement_stock ms
+      JOIN article a ON ms.id_article = a.id
+      LEFT JOIN unite_mesure u ON a.id_unite = u.id
+      JOIN type_mouvement_stock tms ON ms.id_type_mouvement = tms.id
+      LEFT JOIN depot d ON ms.id_depot = d.id
+      LEFT JOIN utilisateur usr ON ms.id_utilisateur = usr.id
+      $whereClause
+      ORDER BY ms.id DESC
+      LIMIT $limit
+    ''';
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery(query, args);
+    return maps.map((m) => MouvementStock.fromMap(m)).toList();
+  }
+
+  // Types de mouvements de stock disponibles
+  Future<List<Map<String, dynamic>>> getTypesMouvementStock() async {
+    final db = await _dbHelper.database;
+    return await db.query('type_mouvement_stock', where: 'actif = 1', orderBy: 'numero ASC');
   }
 }
