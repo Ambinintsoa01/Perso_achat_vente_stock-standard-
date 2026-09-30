@@ -150,6 +150,60 @@ class VenteService {
     return maps.map((m) => CommandeVenteLigne.fromMap(m)).toList();
   }
 
+  // Obtenir une commande de vente par ID avec ses infos de facturation complètes
+  Future<CommandeVente?> getCommandeById(int id) async {
+    final db = await _dbHelper.database;
+    final query = '''
+      SELECT 
+        cv.*,
+        c.nom_complet as client_nom,
+        s.numero as statut_numero,
+        s.code as statut_code,
+        s.libelle as statut_libelle,
+        COUNT(cvl.id) as lignes_count,
+        COALESCE(fc.montant_paye, 0.0) as montant_paye,
+        fc.id as id_facture,
+        fc.numero_facture as numero_facture
+      FROM commande_vente cv
+      JOIN client c ON cv.id_client = c.id
+      JOIN statut s ON cv.id_statut = s.id
+      LEFT JOIN commande_vente_ligne cvl ON cv.id = cvl.id_commande_vente
+      LEFT JOIN facture_client fc ON cv.id = fc.id_commande_vente
+      WHERE cv.id = ?
+      GROUP BY cv.id
+    ''';
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery(query, [id]);
+    if (maps.isEmpty) return null;
+    return CommandeVente.fromMap(maps.first);
+  }
+
+  // Obtenir les détails des règlements d'une commande
+  Future<List<Map<String, dynamic>>> getPaiementsCommande(int idCommande) async {
+    final db = await _dbHelper.database;
+    final query = '''
+      SELECT 
+        pv.*,
+        mp.libelle as mode_paiement_libelle,
+        c.nom as caisse_nom
+      FROM paiement_vente pv
+      JOIN facture_client fc ON pv.id_facture_client = fc.id
+      JOIN mode_paiement mp ON pv.id_mode_paiement = mp.id
+      LEFT JOIN caisse c ON pv.id_caisse = c.id
+      WHERE fc.id_commande_vente = ?
+      ORDER BY pv.id ASC
+    ''';
+    return await db.rawQuery(query, [idCommande]);
+  }
+
+  // Obtenir un client par ID
+  Future<Client?> getClientById(int idClient) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query('client', where: 'id = ?', whereArgs: [idClient]);
+    if (maps.isEmpty) return null;
+    return Client.fromMap(maps.first);
+  }
+
   // Synthèse financière des ventes (KPIs)
   Future<VenteSummary> getVenteSummary() async {
     final db = await _dbHelper.database;

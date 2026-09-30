@@ -6,12 +6,14 @@ import '../../../theme/app_theme.dart';
 class CommandeVenteCard extends StatelessWidget {
   final CommandeVente commande;
   final VoidCallback? onEncaisser;
+  final VoidCallback? onPrint;
   final VoidCallback? onTap;
 
   const CommandeVenteCard({
     super.key,
     required this.commande,
     this.onEncaisser,
+    this.onPrint,
     this.onTap,
   });
 
@@ -73,21 +75,41 @@ class CommandeVenteCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    estPaye ? 'ENCAISSÉ' : 'CRÉANCE CLIENT',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: statusColor,
-                      letterSpacing: 0.3,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        estPaye ? 'ENCAISSÉ' : 'CRÉANCE CLIENT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (onPrint != null) ...[
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: onPrint,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.print_outlined, size: 16, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

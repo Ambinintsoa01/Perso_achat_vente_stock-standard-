@@ -5,12 +5,15 @@ import '../../models/caisse.dart';
 import '../../models/client.dart';
 import '../../models/journal_caisse.dart';
 import '../../models/mode_paiement.dart';
+import '../../services/auth_service.dart';
 import '../../services/caisse_service.dart';
 import '../../services/stock_service.dart';
 import '../../services/vente_service.dart';
 import '../../theme/app_theme.dart';
 import '../caisse/widgets/ouvrir_caisse_dialog.dart';
 import 'widgets/nouveau_client_dialog.dart';
+import 'widgets/thermal_printer_config_dialog.dart';
+import 'widgets/vente_succes_dialog.dart';
 
 class NouvelleVenteScreen extends StatefulWidget {
   const NouvelleVenteScreen({super.key});
@@ -228,7 +231,7 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await _venteService.enregistrerVente(
+      final idCommande = await _venteService.enregistrerVente(
         idClient: _selectedClientId!,
         articlesVendus: _panier,
         payeImmediatement: _payeImmediatement,
@@ -237,18 +240,54 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       );
 
+      final commande = await _venteService.getCommandeById(idCommande);
+      final lignes = await _venteService.getLignesCommande(idCommande);
+      Client? client;
+      if (_selectedClientId != null) {
+        client = await _venteService.getClientById(_selectedClientId!);
+      }
+      String? modeNom;
+      if (_selectedModePaiementId != null) {
+        final m = _modesPaiement.where((m) => m.id == _selectedModePaiementId).firstOrNull;
+        modeNom = m?.libelle;
+      }
+      final currentUser = AuthService.instance.currentUser;
+      final caissierNom = currentUser != null ? '${currentUser.prenom ?? ''} ${currentUser.nom}'.trim() : null;
+
       if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.darkCard,
-            content: Text(
-              _payeImmediatement
-                  ? 'Vente enregistrée et encaissée avec succès !'
-                  : 'Vente enregistrée à crédit (créance client) !',
+        if (commande != null) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogCtx) => VenteSuccesDialog(
+              commande: commande,
+              lignes: lignes,
+              client: client,
+              caissierNom: caissierNom,
+              modePaiementNom: modeNom,
+              onNouvelleVente: () {
+                Navigator.pop(dialogCtx);
+                _reinitialiserVente();
+              },
+              onFermer: () {
+                Navigator.pop(dialogCtx);
+                Navigator.pop(context, true);
+              },
             ),
-          ),
-        );
+          );
+        } else {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppTheme.darkCard,
+              content: Text(
+                _payeImmediatement
+                    ? 'Vente enregistrée et encaissée avec succès !'
+                    : 'Vente enregistrée à crédit (créance client) !',
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -259,6 +298,19 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _reinitialiserVente() {
+    setState(() {
+      _panier.clear();
+      _quantiteController.text = '1';
+      _remiseController.text = '0';
+      _notesController.clear();
+      if (_articles.isNotEmpty) {
+        _prixUnitaireController.text = _articles.first.prixVenteStandard.toStringAsFixed(0);
+      }
+    });
+    _loadDependencies();
   }
 
   @override
@@ -284,6 +336,18 @@ class _NouvelleVenteScreenState extends State<NouvelleVenteScreen> {
           'NOUVELLE VENTE',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: 0.5),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print_rounded),
+            tooltip: 'Paramètres Imprimante Thermique',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const ThermalPrinterConfigDialog(),
+              );
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.black))

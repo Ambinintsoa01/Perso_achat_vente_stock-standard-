@@ -41,6 +41,8 @@ dependencies:
   intl: ^0.20.3
   supabase_flutter: ^2.17.2
   shared_preferences: ^2.5.5
+  printing: ^5.14.3
+  pdf: ^3.12.0
 
 dev_dependencies:
   flutter_test:

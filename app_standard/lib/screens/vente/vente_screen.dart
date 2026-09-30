@@ -15,6 +15,8 @@ import 'nouvelle_vente_screen.dart';
 import 'widgets/commande_vente_card.dart';
 import 'widgets/encaisser_creance_dialog.dart';
 import 'widgets/nouveau_client_dialog.dart';
+import 'widgets/thermal_printer_config_dialog.dart';
+import '../../services/thermal_printer_service.dart';
 
 class VenteScreen extends StatefulWidget {
   const VenteScreen({super.key});
@@ -209,12 +211,93 @@ class _VenteScreenState extends State<VenteScreen> {
                     ],
                   ),
                 ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _imprimerTicketThermique(commande);
+                        },
+                        icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                        label: const Text('IMPRIMER TICKET THERMIQUE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _partagerPdf(commande);
+                      },
+                      icon: const Icon(Icons.share_rounded, size: 16),
+                      label: const Text('PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  void _imprimerTicketThermique(CommandeVente commande, {bool forceDialog = false}) async {
+    try {
+      final lignes = await _venteService.getLignesCommande(commande.id);
+      final client = await _venteService.getClientById(commande.idClient);
+      final paiements = await _venteService.getPaiementsCommande(commande.id);
+      final modeNom = paiements.isNotEmpty ? paiements.first['mode_paiement_libelle'] as String? : null;
+
+      if (!mounted) return;
+      await ThermalPrinterService.instance.printTicket(
+        context: context,
+        commande: commande,
+        lignes: lignes,
+        client: client,
+        modePaiementNom: modeNom,
+        forceDialog: forceDialog,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: AppTheme.danger, content: Text('Erreur: $e')),
+        );
+      }
+    }
+  }
+
+  void _partagerPdf(CommandeVente commande) async {
+    try {
+      final lignes = await _venteService.getLignesCommande(commande.id);
+      final client = await _venteService.getClientById(commande.idClient);
+      final paiements = await _venteService.getPaiementsCommande(commande.id);
+      final modeNom = paiements.isNotEmpty ? paiements.first['mode_paiement_libelle'] as String? : null;
+
+      await ThermalPrinterService.instance.shareTicket(
+        commande: commande,
+        lignes: lignes,
+        client: client,
+        modePaiementNom: modeNom,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: AppTheme.danger, content: Text('Erreur: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -239,6 +322,16 @@ class _VenteScreenState extends State<VenteScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Paramètres Imprimante Thermique',
+            icon: const Icon(Icons.print_rounded, size: 22),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const ThermalPrinterConfigDialog(),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Nouveau Client',
             icon: const Icon(Icons.person_add_alt_1_outlined, size: 22),
@@ -511,6 +604,7 @@ class _VenteScreenState extends State<VenteScreen> {
                             commande: cmd,
                             onTap: () => _afficherDetailsCommande(cmd),
                             onEncaisser: () => _ouvrirEncaissementCreance(cmd),
+                            onPrint: () => _imprimerTicketThermique(cmd),
                           );
                         },
                       ),

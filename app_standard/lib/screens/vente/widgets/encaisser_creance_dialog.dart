@@ -70,9 +70,10 @@ class _EncaisserCreanceDialogState extends State<EncaisserCreanceDialog> {
       );
 
       if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
         widget.onSuccess();
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             backgroundColor: AppTheme.darkCard,
             content: Text('Encaissement de ${montant.toStringAsFixed(0)} Ar enregistré avec succès'),
