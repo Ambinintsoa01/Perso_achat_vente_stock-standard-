@@ -6,10 +6,12 @@ import '../../../theme/app_theme.dart';
 
 class JournalCaisseDetailsDialog extends StatefulWidget {
   final int idJournal;
+  final JournalCaisse? initialJournal;
 
   const JournalCaisseDetailsDialog({
     super.key,
     required this.idJournal,
+    this.initialJournal,
   });
 
   @override
@@ -30,7 +32,12 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
   @override
   void initState() {
     super.initState();
-    _loadDetails();
+    if (widget.initialJournal != null) {
+      _journal = widget.initialJournal;
+      _isLoading = false;
+    } else {
+      _loadDetails();
+    }
   }
 
   Future<void> _loadDetails() async {
@@ -84,17 +91,18 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 620, maxHeight: 780),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(18),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // En-tête
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -104,24 +112,26 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
                     ),
                     child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 22),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 4,
                           children: [
                             Text(
                               j.numeroJournal,
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
                                 color: isOuvert ? const Color(0xFFE8F5E9) : Colors.black.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(8),
@@ -141,7 +151,7 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
                         Text(
                           'Date : ${j.dateJournal}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: AppTheme.textSecondary,
                           ),
                         ),
@@ -150,16 +160,18 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
 
               // Synthèse Carte Noire
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: Colors.black,
                   borderRadius: BorderRadius.circular(16),
@@ -167,35 +179,45 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
                 child: Column(
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildSummaryItem('REPORT OUVERTURE', j.soldeOuvertureTotal, Colors.white),
-                        _buildSummaryItem('ENTRÉES (+)', j.totalEntrees, const Color(0xFFA5D6A7)),
-                        _buildSummaryItem('SORTIES (-)', j.totalSorties, const Color(0xFFEF9A9A)),
-                        _buildSummaryItem('THÉORIQUE', j.soldeTheoriqueTotal, Colors.white),
+                        Expanded(child: _buildSummaryItem('OUVERTURE', j.soldeOuvertureTotal, Colors.white)),
+                        const SizedBox(width: 4),
+                        Expanded(child: _buildSummaryItem('ENTRÉES (+)', j.totalEntrees, const Color(0xFFA5D6A7))),
+                        const SizedBox(width: 4),
+                        Expanded(child: _buildSummaryItem('SORTIES (-)', j.totalSorties, const Color(0xFFEF9A9A))),
+                        const SizedBox(width: 4),
+                        Expanded(child: _buildSummaryItem('THÉORIQUE', j.soldeTheoriqueTotal, Colors.white, isBold: true)),
                       ],
                     ),
                     if (!isOuvert) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       const Divider(color: Colors.white24, height: 1),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildSummaryItem('RÉEL COMPTÉ', j.soldeReelTotal, Colors.white, isBold: true),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: j.hasEcart
-                                  ? (j.ecartTotal > 0 ? const Color(0xFFEF6C00) : const Color(0xFFC62828))
-                                  : const Color(0xFF2E7D32),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              j.hasEcart
-                                  ? 'Écart : ${j.ecartTotal >= 0 ? '+' : ''}${currencyFormatter.format(j.ecartTotal)}'
-                                  : '✓ Écart : 0 Ar (Parfait)',
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                          Flexible(
+                            child: _buildSummaryItem('RÉEL COMPTÉ', j.soldeReelTotal, Colors.white, isBold: true),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: j.hasEcart
+                                    ? (j.ecartTotal > 0 ? const Color(0xFFEF6C00) : const Color(0xFFC62828))
+                                    : const Color(0xFF2E7D32),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  j.hasEcart
+                                      ? 'Écart : ${j.ecartTotal >= 0 ? '+' : ''}${currencyFormatter.format(j.ecartTotal)}'
+                                      : '✓ Écart : 0 Ar (Parfait)',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -204,7 +226,7 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // Informations Caissiers & Horodatage
               Container(
@@ -244,7 +266,7 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // Détail des comptes de caisse (lignes)
               const Text(
@@ -278,40 +300,68 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                l.caisseNom ?? 'Compte #${l.idCaisse}',
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                              ),
-                              if (l.soldeReel != null)
-                                Text(
-                                  'Réel : ${currencyFormatter.format(l.soldeReel!)}',
+                              Expanded(
+                                child: Text(
+                                  l.caisseNom ?? 'Compte #${l.idCaisse}',
                                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Théorique: ${currencyFormatter.format(l.soldeTheorique)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 2,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
-                                'Report: ${currencyFormatter.format(l.soldeOuverture)} | +${currencyFormatter.format(l.totalEntrees)} | -${currencyFormatter.format(l.totalSorties)}',
+                                'Report: ${currencyFormatter.format(l.soldeOuverture)}',
                                 style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                               ),
                               Text(
-                                'Théorique: ${currencyFormatter.format(l.soldeTheorique)}',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                '+${currencyFormatter.format(l.totalEntrees)}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                '-${currencyFormatter.format(l.totalSorties)}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFFC62828), fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
-                          if (l.hasEcart) ...[
+                          if (l.soldeReel != null || l.hasEcart) ...[
                             const SizedBox(height: 4),
-                            Text(
-                              'Écart: ${l.ecart >= 0 ? '+' : ''}${currencyFormatter.format(l.ecart)}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: l.ecart > 0 ? const Color(0xFFEF6C00) : const Color(0xFFC62828),
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                if (l.soldeReel != null)
+                                  Flexible(
+                                    child: Text(
+                                      'Réel compté: ${currencyFormatter.format(l.soldeReel!)}',
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                if (l.hasEcart)
+                                  Flexible(
+                                    child: Text(
+                                      'Écart: ${l.ecart >= 0 ? '+' : ''}${currencyFormatter.format(l.ecart)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: l.ecart > 0 ? const Color(0xFFEF6C00) : const Color(0xFFC62828),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ],
                         ],
@@ -355,14 +405,21 @@ class _JournalCaisseDetailsDialogState extends State<JournalCaisseDetailsDialog>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(color: Colors.white60, fontSize: 9, fontWeight: FontWeight.w700)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            title,
+            style: const TextStyle(color: Colors.white60, fontSize: 8.5, fontWeight: FontWeight.w700),
+          ),
+        ),
         const SizedBox(height: 2),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
           child: Text(
             currencyFormatter.format(amount),
-            style: TextStyle(color: color, fontSize: 13, fontWeight: isBold ? FontWeight.w800 : FontWeight.w700),
+            style: TextStyle(color: color, fontSize: 12, fontWeight: isBold ? FontWeight.w800 : FontWeight.w700),
           ),
         ),
       ],

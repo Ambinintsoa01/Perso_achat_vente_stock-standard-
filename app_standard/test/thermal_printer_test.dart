@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:app_standard/database/db_helper.dart';
-import 'package:app_standard/models/client.dart';
 import 'package:app_standard/models/commande_vente.dart';
 import 'package:app_standard/models/thermal_printer_settings.dart';
 import 'package:app_standard/screens/vente/widgets/commande_vente_card.dart';

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:app_standard/database/db_helper.dart';
+import 'package:app_standard/models/journal_caisse.dart';
 import 'package:app_standard/screens/caisse/caisse_screen.dart';
+import 'package:app_standard/screens/caisse/widgets/journal_caisse_details_dialog.dart';
 import 'package:app_standard/services/auth_service.dart';
 import 'package:app_standard/services/caisse_service.dart';
 
@@ -265,5 +267,46 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump(const Duration(seconds: 12));
+  });
+
+  testWidgets('JournalCaisseDetailsDialog renders without overflow on a narrow mobile viewport (360x640)', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    JournalCaisse? journal;
+    await tester.runAsync(() async {
+      final caisses = await caisseService.getCaisses();
+      final soldes = {for (var c in caisses) c.id: c.soldeActuel};
+      final j = await caisseService.ouvrirJournal(
+        idUtilisateur: 1,
+        soldesOuvertureParCaisse: soldes,
+        notes: 'Ouverture test',
+      );
+      journal = await caisseService.getJournalDetails(j.id);
+    });
+
+    expect(journal, isNotNull);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: JournalCaisseDetailsDialog(
+            idJournal: journal!.id,
+            initialJournal: journal,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('OUVERT'), findsOneWidget);
+    expect(find.text('OUVERTURE'), findsOneWidget);
+    expect(find.text('THÉORIQUE'), findsOneWidget);
+    expect(find.text('DÉTAIL PAR COMPTE DE CAISSE'), findsOneWidget);
+    expect(find.text('FERMER'), findsOneWidget);
   });
 }
